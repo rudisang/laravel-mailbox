@@ -7,3 +7,6 @@ parameters:
         - config
         - routes
     tmpDir: build/phpstan
+    type_coverage:
+        # Typed class constants require PHP 8.3; this package supports PHP 8.2.
+        constant_type: 0

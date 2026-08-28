@@ -23,6 +23,8 @@ use Rudisang\Mailbox\Console\ClearCommand;
 use Rudisang\Mailbox\Console\DoctorCommand;
 use Rudisang\Mailbox\Console\PruneCommand;
 use Rudisang\Mailbox\Mime\StructuredMessageExtractor;
+use Rudisang\Mailbox\Security\AttachmentPolicy;
+use Rudisang\Mailbox\Security\HtmlPreviewSanitizer;
 use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Storage\Pruner;
@@ -51,6 +53,8 @@ class MailboxServiceProvider extends ServiceProvider
 
         $this->app->singleton(EnvironmentGuard::class, fn (Application $app) => new EnvironmentGuard($app, $app->make('config')));
         $this->app->singleton(Limits::class, fn (Application $app) => Limits::fromConfig((array) $app->make('config')->get('mailbox.limits', [])));
+        $this->app->singleton(HtmlPreviewSanitizer::class, fn (Application $app) => new HtmlPreviewSanitizer($app->make(Limits::class)));
+        $this->app->singleton(AttachmentPolicy::class);
         $this->app->singleton(StructuredMessageExtractor::class, fn (Application $app) => new StructuredMessageExtractor($app->make(Limits::class)));
         $this->app->singleton(StoragePaths::class, fn (Application $app) => StoragePaths::fromConfig($app->make('config'), $app));
         $this->app->singleton(MaintenanceLock::class, fn (Application $app) => new MaintenanceLock($app->make(StoragePaths::class)->lock()));

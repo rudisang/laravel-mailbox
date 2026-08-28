@@ -181,6 +181,7 @@
             @forelse ($detail->diagnostics['results'] as $result)
                 <li data-severity="{{ $result['severity'] }}">
                     <strong>{{ $result['severity'] }}</strong>
+                    <code>{{ $result['rule'] }}</code>
                     <span>{{ $result['message'] }}</span>
                 </li>
             @empty

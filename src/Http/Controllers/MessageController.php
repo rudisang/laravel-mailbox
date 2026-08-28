@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 use Rudisang\Mailbox\Http\MessagePresenter;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 final class MessageController
 {
@@ -49,7 +49,7 @@ final class MessageController
         ]);
     }
 
-    public function raw(Request $request, string $id): StreamedResponse
+    public function raw(Request $request, string $id): Response
     {
         if ($this->store->find($id) === null) {
             abort(404);
@@ -75,19 +75,16 @@ final class MessageController
         ];
 
         if ($request->boolean('download')) {
-            $headers['Content-Disposition'] = 'attachment; filename="'.$id.'.eml"';
+            $headers['Content-Disposition'] = 'attachment; filename='.$id.'.eml';
         }
 
-        return response()->stream(static function () use ($path): void {
-            $handle = fopen($path, 'rb');
+        $contents = file_get_contents($path);
 
-            if ($handle === false) {
-                return;
-            }
+        if ($contents === false) {
+            abort(404);
+        }
 
-            fpassthru($handle);
-            fclose($handle);
-        }, 200, $headers);
+        return response($contents, 200, $headers);
     }
 
     public function read(Request $request, string $id): JsonResponse|RedirectResponse

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Http;
 
-use InvalidArgumentException;
+use Rudisang\Mailbox\Security\AttachmentPolicy;
+use Rudisang\Mailbox\Security\Diagnostics;
+use Rudisang\Mailbox\Security\HtmlPreviewSanitizer;
 use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Storage\PartRecord;
@@ -16,17 +18,9 @@ final class MessagePresenter
     public function __construct(
         private readonly MessageStore $store,
         private readonly StoragePaths $paths,
-        ?object $sanitizer = null,
-        ?object $policy = null,
-    ) {
-        if ($sanitizer !== null && ! method_exists($sanitizer, 'sanitize')) {
-            throw new InvalidArgumentException('The preview sanitizer must provide a sanitize method.');
-        }
-
-        if ($policy !== null && ! method_exists($policy, 'inlineType')) {
-            throw new InvalidArgumentException('The attachment policy must provide an inlineType method.');
-        }
-    }
+        private readonly HtmlPreviewSanitizer $sanitizer,
+        private readonly AttachmentPolicy $policy,
+    ) {}
 
     public function detail(string $id): ?MessageDetail
     {
@@ -41,6 +35,8 @@ final class MessagePresenter
         $mimeTree = [];
         $html = $this->html($record);
         $text = $this->text($record);
+        $cidMap = [];
+        $htmlBytes = null;
 
         foreach ($parts as $part) {
             $mimeTree[] = [
@@ -48,6 +44,14 @@ final class MessagePresenter
                 'label' => $this->partLabel($part),
                 'part' => $part,
             ];
+
+            if ($part->contentId !== null && $part->contentId !== '') {
+                $cidMap[$part->contentId] = $part->id;
+            }
+
+            if ($part->mediaType === 'text' && $part->mediaSubtype === 'html' && ! $part->isAttachment && $part->isLeaf()) {
+                $htmlBytes ??= $part->decodedBytes;
+            }
 
             if (! $part->isAttachment && ! $part->isInline) {
                 continue;
@@ -58,9 +62,17 @@ final class MessagePresenter
                 'url' => route('mailbox.part', ['id' => $record->id, 'part' => $part->id]),
                 'filename' => $part->filename ?? 'part-'.$part->position,
                 'size' => $part->decodedBytes,
-                'inlineable' => false,
+                'inlineable' => $this->inlineable($record, $part),
             ];
         }
+
+        $preview = $html === null
+            ? null
+            : $this->sanitizer->sanitize(
+                $html,
+                $cidMap,
+                rtrim(route('mailbox.message', ['id' => $record->id]), '/').'/parts',
+            );
 
         return new MessageDetail(
             $record,
@@ -68,8 +80,8 @@ final class MessagePresenter
             $attachments,
             $text,
             $record->hasHtml && $html !== null,
-            [],
-            ['rules_version' => '0', 'results' => []],
+            $preview === null ? [] : $preview->links,
+            Diagnostics::evaluate($record, $parts, $preview, $htmlBytes),
             $mimeTree,
             [
                 'previewHtml' => route('mailbox.preview.html', ['id' => $record->id]),
@@ -107,13 +119,20 @@ final class MessagePresenter
         }
 
         $limits = Limits::fromConfig((array) config('mailbox.limits', []));
-        $contents = file_get_contents($path, false, null, 0, max(0, $limits->previewBytes));
+        $contents = file_get_contents($path, false, null, 0, max(0, $limits->previewBytes + 1));
 
         if ($contents === false) {
             return null;
         }
 
         return mb_convert_encoding($contents, 'UTF-8', 'UTF-8');
+    }
+
+    private function inlineable(MessageRecord $record, PartRecord $part): bool
+    {
+        $path = $this->paths->part($record->id, $part->id);
+
+        return is_file($path) && $this->policy->inlineType($path) !== null;
     }
 
     private function part(MessageRecord $record, string $subtype): ?PartRecord
