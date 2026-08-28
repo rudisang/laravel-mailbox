@@ -15,6 +15,7 @@ use Symfony\Component\Mime\Header\UnstructuredHeader;
 use Symfony\Component\Mime\Part\AbstractMultipartPart;
 use Symfony\Component\Mime\Part\AbstractPart;
 use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\MessagePart;
 use Symfony\Component\Mime\Part\TextPart;
 use Throwable;
 
@@ -54,7 +55,7 @@ final class StructuredMessageExtractor
 
         try {
             $root = $email->getBody();
-        } catch (LogicException) {
+        } catch (Throwable $exception) {
             return new ExtractedMessage(
                 $subject,
                 $from,
@@ -70,7 +71,9 @@ final class StructuredMessageExtractor
                 null,
                 $this->searchText($subject, $addressEmails, null),
                 'failed',
-                'no_body',
+                $exception instanceof LogicException
+                    ? 'no_body'
+                    : substr('body:'.get_debug_type($exception), 0, 120),
                 0,
                 0,
             );
@@ -162,7 +165,7 @@ final class StructuredMessageExtractor
             }
 
             $headerBody = $headers->getHeaderBody('Content-Transfer-Encoding');
-            $transferEncoding = is_string($headerBody) ? $headerBody : null;
+            $transferEncoding = ! $part instanceof MessagePart && is_string($headerBody) ? $headerBody : null;
             $isInline = $disposition === 'inline' && $contentId !== null;
             $isAttachment = $disposition === 'attachment'
                 || ($disposition === 'inline' && $contentId === null && $part instanceof DataPart);

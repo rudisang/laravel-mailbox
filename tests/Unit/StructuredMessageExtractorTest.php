@@ -6,6 +6,9 @@ use Rudisang\Mailbox\Mime\ExtractedMessage;
 use Rudisang\Mailbox\Mime\StructuredMessageExtractor;
 use Rudisang\Mailbox\Support\Limits;
 use Rudisang\Mailbox\Tests\Fixtures\Emails;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\File;
 
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/mailbox-extract-'.bin2hex(random_bytes(4));
@@ -67,12 +70,20 @@ it('extracts related inline parts with content ids', function () {
         ->and($m->attachmentCount)->toBe(0);
 });
 
-it('records nested message/rfc822 and calendar parts', function () {
-    $nested = $this->extractor->extract(Emails::nestedRfc822(), $this->dir);
+it('stores nested message/rfc822 bodies raw', function () {
+    $message = $this->extractor->extract(Emails::nestedRfc822(), $this->dir);
+    $nested = array_values(array_filter($message->parts, fn ($part) => $part->mediaType.'/'.$part->mediaSubtype === 'message/rfc822'))[0];
+    $blob = file_get_contents($nested->blobPath);
+
+    expect($blob)->toContain('Subject: Inner message')
+        ->and($blob)->toContain('Plain body text')
+        ->and($nested->transferEncoding)->toBeNull();
+});
+
+it('records calendar parts', function () {
     $calendar = $this->extractor->extract(Emails::calendar(), $this->dir);
 
-    expect(array_map(fn ($p) => $p->mediaType.'/'.$p->mediaSubtype, $nested->parts))->toContain('message/rfc822')
-        ->and(array_map(fn ($p) => $p->mediaType.'/'.$p->mediaSubtype, $calendar->parts))->toContain('text/calendar');
+    expect(array_map(fn ($p) => $p->mediaType.'/'.$p->mediaSubtype, $calendar->parts))->toContain('text/calendar');
 });
 
 it('keeps bcc as a separate semantic fact', function () {
@@ -103,6 +114,51 @@ it('marks the message partial when the part limit is exceeded but keeps what fit
     expect($m->parseStatus)->toBe('partial')
         ->and($m->parseError)->toBe('limit:parts')
         ->and(count($m->parts))->toBeLessThanOrEqual(5);
+});
+
+it('marks a bodiless email as failed with no_body', function () {
+    $email = (new Email)->from('a@example.com')->to('b@example.com')->subject('x');
+
+    $m = $this->extractor->extract($email, $this->dir);
+
+    expect($m->parseStatus)->toBe('failed')
+        ->and($m->parseError)->toBe('no_body')
+        ->and($m->parts)->toBe([]);
+});
+
+it('marks the message partial when the depth limit is exceeded', function () {
+    $extractor = new StructuredMessageExtractor(Limits::fromConfig(['depth' => 1]));
+    $email = Emails::relatedWithCid()->attach('kept attachment', 'kept.txt', 'text/plain');
+
+    $m = $extractor->extract($email, $this->dir);
+    $kept = array_values(array_filter($m->parts, fn ($part) => $part->filename === 'kept.txt'))[0];
+
+    expect($m->parseStatus)->toBe('partial')
+        ->and($m->parseError)->toBe('limit:depth')
+        ->and($m->parts)->not->toBeEmpty()
+        ->and($kept->depth)->toBe(1)
+        ->and(file_exists($kept->blobPath))->toBeTrue();
+});
+
+it('records a per-part failure and continues with siblings', function () {
+    $email = Emails::plain();
+    $email->addPart(new DataPart(new File('/nonexistent/path.bin'), 'x.bin'));
+    $email->attach('normal attachment', 'normal.txt', 'text/plain');
+
+    set_error_handler(static fn (): bool => true);
+
+    try {
+        $m = $this->extractor->extract($email, $this->dir);
+    } finally {
+        restore_error_handler();
+    }
+
+    $sibling = array_values(array_filter($m->parts, fn ($part) => $part->filename === 'normal.txt'))[0];
+
+    expect($m->parseStatus)->toBe('partial')
+        ->and($m->parseError)->toStartWith('part:')
+        ->and(strlen((string) $m->parseError))->toBeLessThanOrEqual(120)
+        ->and(file_exists($sibling->blobPath))->toBeTrue();
 });
 
 it('bounds preview and search text', function () {
