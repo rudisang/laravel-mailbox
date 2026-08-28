@@ -10,7 +10,7 @@ use Rudisang\Mailbox\Storage\PartRecord;
 final class Diagnostics
 {
     /** @var non-empty-string */
-    public const RULES_VERSION = '2026.08.1';
+    public const RULES_VERSION = '2026.08.2';
 
     /**
      * @param  list<PartRecord>  $parts
@@ -44,6 +44,8 @@ final class Diagnostics
 
         if ($preview !== null) {
             self::addRemovedRule($results, $preview, 'script', 'html.scripts_removed', 'Script elements were removed.');
+            self::addRemovedRule($results, $preview, 'event_handlers', 'html.event_handlers', 'Event handler attributes were removed.');
+            self::addRemovedRule($results, $preview, 'javascript_urls', 'html.javascript_urls', 'JavaScript URLs were removed.');
             self::addRemovedRule($results, $preview, 'form', 'html.forms_removed', 'Form elements were removed.');
             self::addRemovedRule($results, $preview, 'iframe', 'html.iframes_removed', 'Iframe elements were removed.');
 

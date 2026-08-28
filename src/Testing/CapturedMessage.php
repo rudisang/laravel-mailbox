@@ -129,7 +129,13 @@ final class CapturedMessage
 
     public function raw(): string
     {
-        $contents = file_get_contents($this->paths->raw($this->id()));
+        $path = $this->paths->raw($this->id());
+
+        if (! is_file($path)) {
+            return '';
+        }
+
+        $contents = file_get_contents($path);
 
         return $contents === false ? '' : $contents;
     }
@@ -208,7 +214,13 @@ final class CapturedMessage
                 continue;
             }
 
-            $contents = file_get_contents($this->paths->part($this->id(), $attachment->id));
+            $path = $this->paths->part($this->id(), $attachment->id);
+
+            if (! is_file($path)) {
+                return null;
+            }
+
+            $contents = file_get_contents($path);
 
             return $contents === false ? null : $contents;
         }
@@ -262,33 +274,12 @@ final class CapturedMessage
             }
         }
 
-        $preview = $this->preview();
-        $diagnostics = Diagnostics::evaluate(
+        return $this->diagnostics = Diagnostics::evaluate(
             $this->record,
             $this->parts(),
-            $preview,
+            $this->preview(),
             $htmlBytes,
         );
-
-        if ($preview !== null) {
-            foreach ([
-                'event_handlers' => ['html.event_handlers', 'Event handler attributes were removed.'],
-                'javascript_urls' => ['html.javascript_urls', 'JavaScript URLs were removed.'],
-            ] as $key => [$rule, $message]) {
-                $count = $preview->removed[$key] ?? 0;
-
-                if ($count > 0) {
-                    $diagnostics['results'][] = [
-                        'rule' => $rule,
-                        'severity' => 'warning',
-                        'message' => $message,
-                        'evidence' => $count,
-                    ];
-                }
-            }
-        }
-
-        return $this->diagnostics = $diagnostics;
     }
 
     /** @return list<array{text: string, url: string, openable: bool}> */

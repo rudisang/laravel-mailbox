@@ -41,7 +41,7 @@ final class MailboxTester
         );
     }
 
-    /** @return list<CapturedMessage> */
+    /** @return list<CapturedMessage> Captured messages, newest first. */
     public function all(): array
     {
         $records = [];
@@ -129,7 +129,7 @@ final class MailboxTester
         ));
     }
 
-    /** @return list<CapturedMessage> */
+    /** @return list<CapturedMessage> Newly captured messages, newest first. */
     public function waitForCapture(int $count = 1, float $timeout = 5.0): array
     {
         $deadline = microtime(true) + max(0.0, $timeout);

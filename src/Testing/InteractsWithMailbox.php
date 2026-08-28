@@ -12,6 +12,10 @@ use Rudisang\Mailbox\Security\HtmlPreviewSanitizer;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 
+/**
+ * @phpstan-require-extends TestCase
+ */
+// @phpstan-ignore trait.unused (Public consumer trait; usages live in downstream Laravel test cases.)
 trait InteractsWithMailbox
 {
     /** @var array<string, mixed> */
@@ -58,14 +62,4 @@ trait InteractsWithMailbox
     {
         return $this->app->make(MailboxTester::class);
     }
-}
-
-/**
- * Provides PHPStan with the Laravel test-case context required to analyse the trait.
- *
- * @internal
- */
-abstract class InteractsWithMailboxTestCase extends TestCase
-{
-    use InteractsWithMailbox;
 }

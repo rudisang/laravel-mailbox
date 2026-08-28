@@ -14,12 +14,14 @@ it('evaluates versioned rules', function () {
     $report = Diagnostics::evaluate($record, [], $preview, 150 * 1024);
     $rules = array_column($report['results'], 'severity', 'rule');
 
-    expect($report['rules_version'])->toBe(Diagnostics::RULES_VERSION)
+    expect($report['rules_version'])->toBe('2026.08.2')
         ->and($report['capture_id'])->toBe('01ARZ3NDEKTSV4RRFFQ69G5FAV')
         ->and($rules['parse.status'])->toBe('warning')
         ->and($rules['limits.hit'])->toBe('warning')
         ->and($rules['raw.bcc_present'])->toBe('error')
         ->and($rules['html.scripts_removed'])->toBe('warning')
+        ->and($rules['html.event_handlers'])->toBe('warning')
+        ->and($rules['html.javascript_urls'])->toBe('warning')
         ->and($rules['html.forms_removed'])->toBe('warning')
         ->and($rules['html.tracking_pixels'])->toBe('warning')
         ->and($rules['html.remote_images'])->toBe('info')

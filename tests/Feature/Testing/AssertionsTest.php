@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\AssertionFailedError;
+use Rudisang\Mailbox\Support\StoragePaths;
 use Rudisang\Mailbox\Testing\InteractsWithMailbox;
 use Workbench\App\Mail\HostileMail;
 use Workbench\App\Mail\InvoiceMail;
@@ -53,6 +54,19 @@ it('exposes facts and inline images', function () {
         ->and($m->context()['mailable'])->toBe(WelcomeMail::class)
         ->and($m->links()[0]['url'])->toContain('acme.test/onboarding')
         ->and($m->attachmentContent('missing.pdf'))->toBeNull();
+});
+
+it('handles stale raw and attachment files without warnings', function () {
+    Mail::to('buyer@example.com')->send(new InvoiceMail(123));
+    $message = mailbox()->latest();
+    $attachment = $message->attachments()[0];
+    $paths = app(StoragePaths::class);
+
+    unlink($paths->raw($message->id()));
+    unlink($paths->part($message->id(), $attachment->id));
+
+    expect($message->raw())->toBe('')
+        ->and($message->attachmentContent((string) $attachment->filename))->toBeNull();
 });
 
 it('fails with fact-source labelled messages', function () {
