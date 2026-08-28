@@ -24,33 +24,61 @@ final class RawStreamWriter
 
         $hash = hash_init('sha256');
         $bytes = 0;
+        $closed = false;
 
         try {
             foreach ($chunks as $chunk) {
                 $chunk = (string) $chunk;
-                $bytes += strlen($chunk);
+                $length = strlen($chunk);
+                $bytes += $length;
 
                 if ($bytes > $maxBytes) {
                     throw MessageTooLargeException::limit($maxBytes);
                 }
 
                 hash_update($hash, $chunk);
+                $offset = 0;
 
-                if (fwrite($handle, $chunk) === false) {
-                    throw new RuntimeException('Unable to write the raw message file.');
+                while ($offset < $length) {
+                    $written = fwrite($handle, substr($chunk, $offset));
+
+                    if ($written === false || $written === 0) {
+                        throw new RuntimeException('Unable to write the raw message file.');
+                    }
+
+                    $offset += $written;
                 }
             }
 
-            fflush($handle);
-            fsync($handle);
+            if (! fflush($handle)) {
+                throw new RuntimeException('Unable to flush the raw message file.');
+            }
+
+            if (! fsync($handle)) {
+                throw new RuntimeException('Unable to sync the raw message file.');
+            }
+
+            $closed = true;
+
+            if (! fclose($handle)) {
+                throw new RuntimeException('Unable to close the raw message file.');
+            }
+
+            clearstatcache(true, $path);
+            $size = filesize($path);
+
+            if ($size === false || $size !== $bytes) {
+                throw new RuntimeException('The raw message file size does not match the written byte count.');
+            }
         } catch (Throwable $e) {
-            fclose($handle);
+            if (! $closed) {
+                @fclose($handle);
+            }
+
             @unlink($path);
 
             throw $e;
         }
-
-        fclose($handle);
 
         return ['bytes' => $bytes, 'sha256' => hash_final($hash)];
     }

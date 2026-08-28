@@ -27,7 +27,7 @@ final class PartController
 
         $path = $this->paths->part($id, $part);
 
-        if (! is_file($path)) {
+        if (is_link($path) || ! is_file($path)) {
             abort(404);
         }
 

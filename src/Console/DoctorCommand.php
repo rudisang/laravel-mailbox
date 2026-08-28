@@ -89,6 +89,7 @@ final class DoctorCommand extends Command
             $this->environmentFinding(),
             $this->mailerFinding(),
             $this->failoverFinding(),
+            $this->middlewareFinding(),
             $this->storageFinding(),
             $this->sqliteFinding(),
             $this->schemaFinding(),
@@ -135,11 +136,23 @@ final class DoctorCommand extends Command
 
         if (is_array($configured)) {
             foreach ($configured as $name => $mailer) {
-                if (! is_array($mailer) || ! is_array($mailer['mailers'] ?? null) || ! in_array('local', $mailer['mailers'], true)) {
+                if (! is_array($mailer) || ! is_array($mailer['mailers'] ?? null)) {
                     continue;
                 }
 
-                $composedMailers[] = (string) $name;
+                foreach ($mailer['mailers'] as $referenced) {
+                    if (! is_string($referenced)) {
+                        continue;
+                    }
+
+                    $referencedMailer = $configured[$referenced] ?? null;
+
+                    if (is_array($referencedMailer) && ($referencedMailer['transport'] ?? null) === 'local') {
+                        $composedMailers[] = (string) $name;
+
+                        break;
+                    }
+                }
             }
         }
 
@@ -147,11 +160,23 @@ final class DoctorCommand extends Command
             return $this->finding(
                 'critical',
                 'Failover',
-                'local appears in '.implode(', ', array_map(static fn (string $name): string => 'mail.mailers.'.$name.'.mailers', $composedMailers)).'; remove it from failover or round-robin composition.',
+                'A local transport appears in '.implode(', ', array_map(static fn (string $name): string => 'mail.mailers.'.$name.'.mailers', $composedMailers)).'; remove it from failover or round-robin composition.',
             );
         }
 
         return $this->finding('ok', 'Failover', 'local is not part of a failover or round-robin mailer.');
+    }
+
+    /** @return array{level: 'ok'|'warning'|'critical', label: string, detail: string} */
+    private function middlewareFinding(): array
+    {
+        $middleware = $this->config->get('mailbox.middleware', ['web']);
+
+        if (! is_array($middleware) || ! in_array('web', $middleware, true)) {
+            return $this->finding('critical', 'Middleware', 'mutations lose CSRF protection because mailbox.middleware does not contain web.');
+        }
+
+        return $this->finding('ok', 'Middleware', 'web middleware protects mailbox mutations.');
     }
 
     /** @return array{level: 'ok'|'warning'|'critical', label: string, detail: string} */

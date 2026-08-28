@@ -24,7 +24,9 @@ it('builds safe filenames and dispositions', function () {
         ->and($this->policy->safeFilename(null, 'part.bin'))->toBe('part.bin')
         ->and($this->policy->safeFilename('', 'part.bin'))->toBe('part.bin')
         ->and(strlen($this->policy->safeFilename(str_repeat('a', 300).'.pdf', 'x')))->toBeLessThanOrEqual(120)
-        ->and($this->policy->safeFilename('CON.exe', 'x'))->toBe('CON.exe');
+        ->and($this->policy->safeFilename('CON.exe', 'x'))->toBe('_CON.exe')
+        ->and($this->policy->safeFilename('lpt9.txt', 'x'))->toBe('_lpt9.txt')
+        ->and($this->policy->safeFilename('COM10.txt', 'x'))->toBe('COM10.txt');
     expect(mb_strlen($this->policy->safeFilename('x.'.str_repeat('e', 300), 'x')))->toBeLessThanOrEqual(120);
     $disposition = $this->policy->disposition('résumé — 履歴書 🚀.txt');
     expect($disposition)->toStartWith('attachment; filename=')->toContain("filename*=utf-8''r%C3%A9sum%C3%A9")->not->toContain("\n");

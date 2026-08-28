@@ -322,7 +322,7 @@ class StructuredMessageExtractor
             return null;
         }
 
-        $contents = mb_convert_encoding($contents, 'UTF-8', 'UTF-8');
+        $contents = Charset::toUtf8($contents, $part->charset);
 
         if ($textId === null) {
             $contents = $this->htmlBodyText($contents);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Capture;
 
+use Closure;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\Queue\Job as JobContract;
@@ -19,7 +20,8 @@ final class ContextCollector
      *     to: list<string>,
      *     mailable: ?string,
      *     notification: ?string,
-     *     notification_id: ?string
+     *     notification_id: ?string,
+     *     remembered_at: int
      * }|null
      */
     private ?array $sending = null;
@@ -33,10 +35,20 @@ final class ContextCollector
     /** @var (callable(array<string, string|null>): array<string, string|null>)|null */
     private $redactor = null;
 
+    /** @var Closure(): int */
+    private readonly Closure $clock;
+
+    /** @param (callable(): int)|null $clock */
     public function __construct(
         private readonly Application $app,
         private readonly Repository $config,
-    ) {}
+        private readonly int $sendingTtlNanoseconds = 5_000_000_000,
+        ?callable $clock = null,
+    ) {
+        $this->clock = $clock === null
+            ? static fn (): int => (int) hrtime(true)
+            : Closure::fromCallable($clock);
+    }
 
     public function namespace(): ?string
     {
@@ -60,6 +72,7 @@ final class ContextCollector
             'notification_id' => is_scalar($data['__laravel_notification_id'] ?? null)
                 ? (string) $data['__laravel_notification_id']
                 : null,
+            'remembered_at' => ($this->clock)(),
         ];
     }
 
@@ -135,15 +148,18 @@ final class ContextCollector
             $context['command'] = substr($_SERVER['argv'][1], 0, 128);
         }
 
-        if ($this->sending !== null && $original instanceof Email
-            && $this->sending['subject'] === $original->getSubject()
-            && $this->sending['to'] === AddressNormalizer::emails(array_values($original->getTo()))) {
-            $context['mailable'] = $this->sending['mailable'];
-            $context['notification'] = $this->sending['notification'];
-            $context['notification_id'] = $this->sending['notification_id'];
-        }
-
+        $sending = $this->sending;
         $this->sending = null;
+
+        if ($sending !== null
+            && ($this->clock)() - $sending['remembered_at'] <= $this->sendingTtlNanoseconds
+            && $original instanceof Email
+            && $sending['subject'] === $original->getSubject()
+            && $sending['to'] === AddressNormalizer::emails(array_values($original->getTo()))) {
+            $context['mailable'] = $sending['mailable'];
+            $context['notification'] = $sending['notification'];
+            $context['notification_id'] = $sending['notification_id'];
+        }
 
         $context = array_merge($context, $job, $this->appContext);
         $this->appContext = [];

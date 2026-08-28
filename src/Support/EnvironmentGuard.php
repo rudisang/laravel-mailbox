@@ -27,8 +27,10 @@ final class EnvironmentGuard
         $environment = (string) $this->app->environment();
         $allowed = $this->config->get('mailbox.environments', ['local', 'testing']);
         $allowed = is_array($allowed) ? array_values(array_filter($allowed, 'is_string')) : ['local', 'testing'];
+        $normalisedEnvironment = strtolower($environment);
+        $normalisedAllowed = array_map('strtolower', $allowed);
 
-        if ($environment === 'production' || ! in_array($environment, $allowed, true)) {
+        if ($normalisedEnvironment === 'production' || ! in_array($normalisedEnvironment, $normalisedAllowed, true)) {
             return 'environment:'.$environment;
         }
 

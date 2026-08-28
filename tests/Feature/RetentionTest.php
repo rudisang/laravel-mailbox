@@ -77,6 +77,34 @@ it('scans and repairs orphan directories, dangling rows and stale tmp', function
         ->and($repair->scan())->toBe(['orphan_dirs' => [], 'dangling_rows' => [], 'stale_tmp' => []]);
 });
 
+it('reports truncated raw files and missing leaf blobs as dangling rows', function () {
+    mailboxSendOne('truncated raw');
+    mailboxSendOne('missing leaf');
+    $store = app(MessageStore::class);
+    $paths = app(StoragePaths::class);
+    $records = $store->list();
+    $missingLeaf = $records[0];
+    $truncatedRaw = $records[1];
+    $rawHandle = fopen($paths->raw($truncatedRaw->id), 'c+');
+
+    expect(is_resource($rawHandle))->toBeTrue();
+    ftruncate($rawHandle, $truncatedRaw->rawBytes - 1);
+    fclose($rawHandle);
+
+    $leaf = array_values(array_filter(
+        $store->parts($missingLeaf->id),
+        static fn ($part): bool => $part->isLeaf(),
+    ))[0];
+    unlink($paths->part($missingLeaf->id, $leaf->id));
+
+    $repair = app(Repair::class);
+
+    expect($repair->scan()['dangling_rows'])->toBe([$truncatedRaw->id, $missingLeaf->id])
+        ->and($repair->repair()['dangling_rows'])->toBe(2)
+        ->and($store->find($truncatedRaw->id))->toBeNull()
+        ->and($store->find($missingLeaf->id))->toBeNull();
+});
+
 it('ignores stray files in the messages and tmp directories', function () {
     $paths = app(StoragePaths::class);
     $paths->ensureRoot();

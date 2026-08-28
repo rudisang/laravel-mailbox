@@ -22,6 +22,23 @@ it('doctor reports a mailer collision, failover composition and production as cr
     $this->artisan('mailbox:doctor', ['--json' => true])->assertExitCode(1);
 });
 
+it('doctor resolves local transports referenced under non-local mailer names', function () {
+    config()->set('mail.mailers.captured', ['transport' => 'local']);
+    config()->set('mail.mailers.roundrobin', ['transport' => 'roundrobin', 'mailers' => ['smtp', 'captured']]);
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Failover","detail":"A local transport appears in mail.mailers.roundrobin.mailers')
+        ->assertExitCode(1);
+});
+
+it('doctor reports missing web middleware as critical', function () {
+    config()->set('mailbox.middleware', []);
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Middleware","detail":"mutations lose CSRF protection')
+        ->assertExitCode(1);
+});
+
 it('doctor reports an unreadable schema version as critical', function () {
     app(MessageStore::class)->pdo()->exec("UPDATE mailbox_meta SET value = 'invalid' WHERE key = 'schema_version'");
 

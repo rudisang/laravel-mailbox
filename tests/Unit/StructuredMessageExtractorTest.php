@@ -9,6 +9,7 @@ use Rudisang\Mailbox\Tests\Fixtures\Emails;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\File;
+use Symfony\Component\Mime\Part\TextPart;
 
 beforeEach(function () {
     $this->dir = sys_get_temp_dir().'/mailbox-extract-'.bin2hex(random_bytes(4));
@@ -31,6 +32,20 @@ it('extracts a plain message as a single text part', function () {
         ->and(file_get_contents($m->parts[0]->blobPath))->toBe('Plain body text')
         ->and($m->previewText)->toBe('Plain body text')
         ->and($m->parts[0]->depth)->toBe(0);
+});
+
+it('converts a declared legacy text charset for preview and search facts', function () {
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Legacy charset')
+        ->setBody(new TextPart("caf\xe9", 'iso-8859-1', 'plain', '8bit'));
+
+    $message = $this->extractor->extract($email, $this->dir);
+
+    expect($message->previewText)->toBe('café')
+        ->and($message->searchText)->toContain('café')
+        ->and(file_get_contents($message->parts[0]->blobPath))->toBe("caf\xe9");
 });
 
 it('extracts multipart/alternative with ordered children', function () {

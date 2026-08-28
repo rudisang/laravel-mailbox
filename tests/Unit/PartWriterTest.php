@@ -33,6 +33,23 @@ it('decodes quoted-printable text parts', function () {
     expect(file_get_contents($this->path))->toBe($text);
 });
 
+it('flushes a quoted-printable decoder ending in a soft break', function () {
+    $part = new class('unused', 'utf-8', 'plain', 'quoted-printable') extends TextPart
+    {
+        public function bodyToIterable(): iterable
+        {
+            yield 'tail=';
+            yield "\r\n";
+        }
+    };
+
+    $result = PartWriter::write($part, $this->path);
+
+    expect(file_get_contents($this->path))->toBe('tail')
+        ->and($result['bytes'])->toBe(4)
+        ->and($result['sha256'])->toBe(hash('sha256', 'tail'));
+});
+
 it('decodes a bare-LF source body to the CRLF-canonical wire form', function () {
     $text = "first line\nsecond line";
     $part = new TextPart($text, 'utf-8', 'plain', 'quoted-printable');

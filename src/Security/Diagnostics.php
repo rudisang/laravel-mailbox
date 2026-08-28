@@ -10,7 +10,7 @@ use Rudisang\Mailbox\Storage\PartRecord;
 final class Diagnostics
 {
     /** @var non-empty-string */
-    public const RULES_VERSION = '2026.08.2';
+    public const RULES_VERSION = '2026.08.3';
 
     /**
      * @param  list<PartRecord>  $parts
@@ -32,6 +32,16 @@ final class Diagnostics
 
         if ($record->parseError !== null && str_contains($record->parseError, 'limit:')) {
             self::add($results, 'limits.hit', 'warning', 'A capture limit was reached.', [$record->parseError]);
+        }
+
+        if (($record->context['raw_headers_truncated'] ?? null) === '1') {
+            self::add(
+                $results,
+                'raw.headers_truncated',
+                'warning',
+                'Bcc status unknown: header block exceeded the configured limit',
+                true,
+            );
         }
 
         foreach ($record->rawHeaders as $header) {

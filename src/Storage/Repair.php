@@ -78,8 +78,23 @@ final class Repair
         $danglingRows = [];
 
         foreach ($ids as $id) {
-            if (! is_file($this->paths->raw($id))) {
+            $record = $this->store->find($id);
+            $rawPath = $this->paths->raw($id);
+            clearstatcache(true, $rawPath);
+            $rawSize = is_file($rawPath) ? filesize($rawPath) : false;
+
+            if ($record === null || $rawSize === false || $rawSize !== $record->rawBytes) {
                 $danglingRows[] = $id;
+
+                continue;
+            }
+
+            foreach ($this->store->parts($id) as $part) {
+                if ($part->isLeaf() && ! is_file($this->paths->part($id, $part->id))) {
+                    $danglingRows[] = $id;
+
+                    break;
+                }
             }
         }
 

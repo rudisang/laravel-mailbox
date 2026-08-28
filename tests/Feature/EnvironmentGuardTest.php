@@ -19,6 +19,21 @@ it('refuses production even when listed', function () {
         ->and(mailboxGuard()->reason())->toBe('environment:production');
 });
 
+it('refuses production case-insensitively even when listed with the same casing', function () {
+    $this->app['env'] = 'Production';
+    config()->set('mailbox.environments', ['Production']);
+
+    expect(mailboxGuard()->allows())->toBeFalse()
+        ->and(mailboxGuard()->reason())->toBe('environment:Production');
+});
+
+it('matches allowed environments case-insensitively', function () {
+    $this->app['env'] = 'LOCAL';
+    config()->set('mailbox.environments', ['local']);
+
+    expect(mailboxGuard()->allows())->toBeTrue();
+});
+
 it('refuses environments that are not listed', function () {
     $this->app['env'] = 'staging';
 

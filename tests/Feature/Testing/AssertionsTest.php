@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Mail;
 use PHPUnit\Framework\AssertionFailedError;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Rudisang\Mailbox\Testing\InteractsWithMailbox;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Mime\Part\TextPart;
 use Workbench\App\Mail\HostileMail;
 use Workbench\App\Mail\InvoiceMail;
 use Workbench\App\Mail\WelcomeMail;
@@ -54,6 +56,20 @@ it('exposes facts and inline images', function () {
         ->and($m->context()['mailable'])->toBe(WelcomeMail::class)
         ->and($m->links()[0]['url'])->toContain('acme.test/onboarding')
         ->and($m->attachmentContent('missing.pdf'))->toBeNull();
+});
+
+it('presents captured legacy charset text as utf-8', function () {
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Legacy charset')
+        ->setBody(new TextPart("caf\xe9", 'iso-8859-1', 'plain', '8bit'));
+
+    Mail::mailer('local')->getSymfonyTransport()->send($email);
+    $message = mailbox()->latest();
+
+    expect($message->record()->previewText)->toBe('café')
+        ->and($message->text())->toBe('café');
 });
 
 it('handles stale raw and attachment files without warnings', function () {

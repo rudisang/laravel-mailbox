@@ -33,7 +33,20 @@ it('reads ordered headers, unfolds continuations and decodes encoded words', fun
 it('stops at the byte limit and never reads the body', function () {
     $path = rawFile('X-A: '.str_repeat('a', 100)."\r\nX-B: b\r\n\r\nbody");
 
-    expect(RawHeaderBlock::read($path, 50))->toBe([['X-A', str_repeat('a', 45)]]);
+    expect(RawHeaderBlock::readWithMeta($path, 50))->toBe([
+        'headers' => [['X-A', str_repeat('a', 45)]],
+        'truncated' => true,
+    ]);
+    @unlink($path);
+});
+
+it('reports a complete header block as not truncated', function () {
+    $path = rawFile("Subject: complete\r\n\r\nbody");
+
+    expect(RawHeaderBlock::readWithMeta($path, 4096))->toBe([
+        'headers' => [['Subject', 'complete']],
+        'truncated' => false,
+    ]);
     @unlink($path);
 });
 

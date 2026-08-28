@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Rudisang\Mailbox\Http\InboxFilters;
 use Rudisang\Mailbox\Http\MessagePresenter;
 use Rudisang\Mailbox\Http\Routing;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,7 @@ final class MessageController
         private readonly MessageStore $store,
         private readonly MessagePresenter $presenter,
         private readonly StoragePaths $paths,
+        private readonly MaintenanceLock $lock,
     ) {}
 
     public function show(Request $request, string $id): View|Response
@@ -59,7 +61,7 @@ final class MessageController
 
         $path = $this->paths->raw($id);
 
-        if (! is_file($path)) {
+        if (is_link($path) || ! is_file($path)) {
             abort(404);
         }
 
@@ -122,7 +124,12 @@ final class MessageController
             abort(404);
         }
 
-        $this->store->delete($id);
+        // Schema initialization takes the same lock, so complete it before maintenance.
+        $this->store->pdo();
+
+        $this->lock->exclusive(function () use ($id): void {
+            $this->store->delete($id);
+        }, true);
 
         if ($request->expectsJson()) {
             return response()->json(['deleted' => true]);
@@ -135,7 +142,7 @@ final class MessageController
     {
         $path = $this->paths->raw($id);
 
-        if (! is_file($path)) {
+        if (is_link($path) || ! is_file($path)) {
             return '';
         }
 

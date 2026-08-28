@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Http;
 
+use Rudisang\Mailbox\Mime\Charset;
 use Rudisang\Mailbox\Security\AttachmentPolicy;
 use Rudisang\Mailbox\Security\Diagnostics;
 use Rudisang\Mailbox\Security\HtmlPreviewSanitizer;
@@ -125,7 +126,7 @@ final class MessagePresenter
             return null;
         }
 
-        return mb_convert_encoding($contents, 'UTF-8', 'UTF-8');
+        return Charset::toUtf8($contents, $part->charset);
     }
 
     private function inlineable(MessageRecord $record, PartRecord $part): bool

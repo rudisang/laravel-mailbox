@@ -11,15 +11,23 @@ final class RawHeaderBlock
     /** @return list<array{0: string, 1: string}> */
     public static function read(string $rawPath, int $maxBytes): array
     {
+        return self::readWithMeta($rawPath, $maxBytes)['headers'];
+    }
+
+    /** @return array{headers: list<array{0: string, 1: string}>, truncated: bool} */
+    public static function readWithMeta(string $rawPath, int $maxBytes): array
+    {
         $handle = @fopen($rawPath, 'rb');
 
         if ($handle === false) {
-            return [];
+            return ['headers' => [], 'truncated' => false];
         }
 
         $headers = [];
         $current = null;
         $consumed = 0;
+        $complete = false;
+        $truncated = false;
 
         try {
             while (true) {
@@ -50,6 +58,8 @@ final class RawHeaderBlock
                 $line = rtrim($line, "\r\n");
 
                 if ($line === '') {
+                    $complete = true;
+
                     break;
                 }
 
@@ -84,11 +94,15 @@ final class RawHeaderBlock
             }
 
             self::flush($headers, $current);
+
+            if (! $complete && $consumed >= $maxBytes) {
+                $truncated = fgetc($handle) !== false;
+            }
         } finally {
             fclose($handle);
         }
 
-        return $headers;
+        return ['headers' => $headers, 'truncated' => $truncated];
     }
 
     /**

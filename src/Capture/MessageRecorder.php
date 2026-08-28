@@ -62,10 +62,11 @@ final class MessageRecorder
 
             $original = $sent->getOriginalMessage();
             $envelope = $sent->getEnvelope();
-            $rawHeaders = RawHeaderBlock::read(
+            $rawHeaderBlock = RawHeaderBlock::readWithMeta(
                 $tmp.DIRECTORY_SEPARATOR.'raw.eml',
                 $this->limits->headerBytes,
             );
+            $rawHeaders = $rawHeaderBlock['headers'];
 
             if ($original instanceof Email) {
                 try {
@@ -79,6 +80,12 @@ final class MessageRecorder
             $this->failures->check('after_extract');
 
             $context = $this->context->take($original, $mailer);
+
+            if (count($context) >= 64 && ! array_key_exists('raw_headers_truncated', $context)) {
+                array_pop($context);
+            }
+
+            $context['raw_headers_truncated'] = $rawHeaderBlock['truncated'] ? '1' : '0';
             $record = $this->buildRecord(
                 $id,
                 $sent,

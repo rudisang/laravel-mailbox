@@ -104,6 +104,35 @@ it('toggles read state, deletes and clears with CSRF protection', function () {
     expect($store->count())->toBe(0);
 });
 
+it('waits for active captures before clearing through the web route', function () {
+    mailboxCapture('Locked clear');
+    $store = app(MessageStore::class);
+    $store->pdo();
+    $holder = proc_open([
+        PHP_BINARY,
+        '-r',
+        '$h=fopen($argv[1],"c+");flock($h,LOCK_SH);echo "held\n";fflush(STDOUT);usleep(1500000);flock($h,LOCK_UN);fclose($h);',
+        mailboxPaths()->lock(),
+    ], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+
+    expect(is_resource($holder))->toBeTrue();
+    expect(trim((string) fgets($pipes[1])))->toBe('held');
+
+    $started = hrtime(true);
+    $response = $this->post('/_mailbox/clear');
+    $elapsed = (hrtime(true) - $started) / 1_000_000_000;
+    $errors = stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    $exitCode = proc_close($holder);
+
+    $response->assertRedirect('/_mailbox');
+    expect($elapsed)->toBeGreaterThanOrEqual(1.0)
+        ->and($errors)->toBe('')
+        ->and($exitCode)->toBe(0)
+        ->and($store->count())->toBe(0);
+});
+
 it('validates read input and returns json mutation results', function () {
     $id = mailboxCapture('JSON mutations');
 
@@ -134,6 +163,28 @@ it('streams raw messages inline and as downloads and 404s when raw is missing', 
     unlink(mailboxPaths()->raw($id));
     $this->get('/_mailbox/messages/'.$id.'/raw')->assertNotFound();
 });
+
+it('refuses symlinked raw messages and part blobs', function () {
+    $id = mailboxCapture('Symlink refusal');
+    $paths = mailboxPaths();
+    $raw = $paths->raw($id);
+    $rawTarget = dirname($raw).DIRECTORY_SEPARATOR.'raw-target.eml';
+    rename($raw, $rawTarget);
+    symlink($rawTarget, $raw);
+
+    $this->get('/_mailbox/messages/'.$id.'/raw')->assertNotFound();
+
+    $part = array_values(array_filter(
+        app(MessageStore::class)->parts($id),
+        static fn ($candidate): bool => $candidate->isLeaf(),
+    ))[0];
+    $blob = $paths->part($id, $part->id);
+    $blobTarget = dirname($blob).DIRECTORY_SEPARATOR.'part-target.bin';
+    rename($blob, $blobTarget);
+    symlink($blobTarget, $blob);
+
+    $this->get('/_mailbox/messages/'.$id.'/parts/'.$part->id)->assertNotFound();
+})->skip(fn (): bool => PHP_OS_FAMILY === 'Windows', 'Symlink creation is not reliably available on Windows.');
 
 it('keeps response-specific headers on preview part raw asset and status routes', function () {
     $id = mailboxCapture('Header exclusions');

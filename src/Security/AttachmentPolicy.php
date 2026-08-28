@@ -37,6 +37,10 @@ final class AttachmentPolicy
             return $fallback;
         }
 
+        if (preg_match('/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i', pathinfo($name, PATHINFO_FILENAME)) === 1) {
+            $name = '_'.$name;
+        }
+
         if (mb_strlen($name) > 120) {
             $extension = pathinfo($name, PATHINFO_EXTENSION);
             $extensionLength = mb_strlen($extension);

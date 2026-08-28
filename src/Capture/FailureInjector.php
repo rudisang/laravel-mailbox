@@ -6,6 +6,9 @@ namespace Rudisang\Mailbox\Capture;
 
 use RuntimeException;
 
+/**
+ * @internal
+ */
 final class FailureInjector
 {
     /** @var array<string, true> */

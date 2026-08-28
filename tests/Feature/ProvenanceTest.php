@@ -192,3 +192,17 @@ it('attributes a mailable when subject and recipients match', function () {
 
     expect(app(MessageStore::class)->list()[0]->context['mailable'])->toBe('App\\Mail\\Matching');
 });
+
+it('does not attribute an expired sending slot', function () {
+    $tick = 0;
+    $clock = static function () use (&$tick): int {
+        return ++$tick;
+    };
+    $collector = new ContextCollector($this->app, config(), 0, $clock);
+    $email = (new Email)->subject('expired')->to('x@example.com');
+    $collector->rememberSending($email, ['__laravel_mailable' => 'App\\Mail\\Expired']);
+
+    $context = $collector->take($email, null);
+
+    expect($context['mailable'])->toBeNull();
+});

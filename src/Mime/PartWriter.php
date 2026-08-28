@@ -29,9 +29,16 @@ final class PartWriter
             throw new RuntimeException('Unable to open the part file for writing.');
         }
 
+        $filterResource = null;
+        $closed = false;
+
         try {
-            if ($filter !== null && stream_filter_append($handle, $filter, STREAM_FILTER_WRITE) === false) {
-                throw new RuntimeException('Unable to attach the decoding stream filter.');
+            if ($filter !== null) {
+                $filterResource = stream_filter_append($handle, $filter, STREAM_FILTER_WRITE);
+
+                if ($filterResource === false) {
+                    throw new RuntimeException('Unable to attach the decoding stream filter.');
+                }
             }
 
             foreach ($part->bodyToIterable() as $chunk) {
@@ -41,22 +48,54 @@ final class PartWriter
                     $chunk = str_replace(["\r", "\n"], '', $chunk);
                 }
 
-                if ($chunk !== '' && fwrite($handle, $chunk) === false) {
-                    throw new RuntimeException('Unable to write the part file.');
+                $length = strlen($chunk);
+                $offset = 0;
+
+                while ($offset < $length) {
+                    $written = fwrite($handle, substr($chunk, $offset));
+
+                    if ($written === false || $written === 0) {
+                        throw new RuntimeException('Unable to write the part file.');
+                    }
+
+                    $offset += $written;
                 }
             }
 
-            fflush($handle);
-            fsync($handle);
+            if ($filterResource !== null && ! stream_filter_remove($filterResource)) {
+                throw new RuntimeException('Unable to remove the decoding stream filter.');
+            }
+
+            $filterResource = null;
+
+            if (! fflush($handle)) {
+                throw new RuntimeException('Unable to flush the part file.');
+            }
+
+            if (! fsync($handle)) {
+                throw new RuntimeException('Unable to sync the part file.');
+            }
+
+            $closed = true;
+
+            if (! fclose($handle)) {
+                throw new RuntimeException('Unable to close the part file.');
+            }
         } catch (Throwable $e) {
-            fclose($handle);
+            if (is_resource($filterResource)) {
+                @stream_filter_remove($filterResource);
+            }
+
+            if (! $closed) {
+                @fclose($handle);
+            }
+
             @unlink($path);
 
             throw $e;
         }
 
-        fclose($handle);
-
+        clearstatcache(true, $path);
         $bytes = filesize($path);
         $sha256 = hash_file('sha256', $path);
 

@@ -10,11 +10,15 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Rudisang\Mailbox\Http\InboxFilters;
 use Rudisang\Mailbox\Http\Routing;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 
 final class InboxController
 {
-    public function __construct(private readonly MessageStore $store) {}
+    public function __construct(
+        private readonly MessageStore $store,
+        private readonly MaintenanceLock $lock,
+    ) {}
 
     public function index(Request $request): View
     {
@@ -41,7 +45,12 @@ final class InboxController
 
     public function clear(Request $request): JsonResponse|RedirectResponse
     {
-        $this->store->clear();
+        // Schema initialization takes the same lock, so complete it before maintenance.
+        $this->store->pdo();
+
+        $this->lock->exclusive(function (): void {
+            $this->store->clear();
+        }, true);
 
         if ($request->expectsJson()) {
             return response()->json(['cleared' => true]);
