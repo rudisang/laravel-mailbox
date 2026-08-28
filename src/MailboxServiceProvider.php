@@ -8,6 +8,8 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
+use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Rudisang\Mailbox\Support\Limits;
 use Rudisang\Mailbox\Support\StoragePaths;
@@ -28,6 +30,8 @@ class MailboxServiceProvider extends ServiceProvider
         $this->app->singleton(EnvironmentGuard::class, fn (Application $app) => new EnvironmentGuard($app, $app->make('config')));
         $this->app->singleton(Limits::class, fn (Application $app) => Limits::fromConfig((array) $app->make('config')->get('mailbox.limits', [])));
         $this->app->singleton(StoragePaths::class, fn (Application $app) => StoragePaths::fromConfig($app->make('config'), $app));
+        $this->app->singleton(MaintenanceLock::class, fn (Application $app) => new MaintenanceLock($app->make(StoragePaths::class)->lock()));
+        $this->app->singleton(MessageStore::class, fn (Application $app) => new MessageStore($app->make(StoragePaths::class), $app->make(MaintenanceLock::class)));
     }
 
     public function boot(): void
