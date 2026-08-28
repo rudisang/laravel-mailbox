@@ -19,22 +19,22 @@ jobs:
             php: '8.2'
             laravel: '12.*'
             testbench: '10.*'
-            dependencies: --prefer-lowest
+            stability: prefer-lowest
           - name: L12 latest
             php: '8.4'
             laravel: '12.*'
             testbench: '10.*'
-            dependencies: --prefer-stable
+            stability: prefer-stable
           - name: L13 floor
             php: '8.3'
             laravel: '13.*'
             testbench: '11.*'
-            dependencies: --prefer-lowest
+            stability: prefer-lowest
           - name: L13 latest
             php: '8.5'
             laravel: '13.*'
             testbench: '11.*'
-            dependencies: --prefer-stable
+            stability: prefer-stable
 
     steps:
       - uses: actions/checkout@v4
@@ -47,10 +47,10 @@ jobs:
       - name: Install matrix dependencies
         run: |
           composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update ${{ matrix.dependencies }} --prefer-dist --no-interaction
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
 
       - name: Run tests
-        run: composer test:unit
+        run: vendor/bin/pest
 
   windows:
     name: Windows
@@ -70,7 +70,7 @@ jobs:
           composer update --prefer-stable --prefer-dist --no-interaction
 
       - name: Run tests
-        run: composer test:unit
+        run: vendor/bin/pest --exclude-group concurrency
 
   browser:
     name: Browser
@@ -124,10 +124,10 @@ jobs:
         run: composer audit
 
       - name: Check formatting
-        run: composer lint:check
+        run: vendor/bin/pint --test
 
       - name: Run static analysis
-        run: composer analyse
+        run: vendor/bin/phpstan analyse
 
       - name: Check type coverage
-        run: composer test:types
+        run: vendor/bin/pest --type-coverage --min=95
