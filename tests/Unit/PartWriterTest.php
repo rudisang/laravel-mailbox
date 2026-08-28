@@ -25,12 +25,22 @@ it('decodes base64 data parts back to the original bytes', function () {
 });
 
 it('decodes quoted-printable text parts', function () {
-    $text = 'Héllo wörld — a very long line '.str_repeat('with soft breaks ', 20)."\nsecond line";
+    $text = 'Héllo wörld — a very long line '.str_repeat('with soft breaks ', 20)."\r\nsecond line";
     $part = new TextPart($text, 'utf-8', 'plain', 'quoted-printable');
 
     PartWriter::write($part, $this->path);
 
     expect(file_get_contents($this->path))->toBe($text);
+});
+
+it('decodes a bare-LF source body to the CRLF-canonical wire form', function () {
+    $text = "first line\nsecond line";
+    $part = new TextPart($text, 'utf-8', 'plain', 'quoted-printable');
+
+    PartWriter::write($part, $this->path);
+
+    // Symfony's QpEncoder canonicalises hard breaks.
+    expect(file_get_contents($this->path))->toBe(str_replace("\n", "\r\n", $text));
 });
 
 it('passes 8bit text parts through unchanged', function () {

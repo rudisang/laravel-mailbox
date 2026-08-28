@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Storage;
 
+use InvalidArgumentException;
 use PDO;
 use PDOException;
 use PDOStatement;
@@ -205,6 +206,10 @@ final class MessageStore
 
     public function delete(string $id): void
     {
+        if (! StoragePaths::isValidId($id)) {
+            throw new InvalidArgumentException('Invalid mailbox identifier.');
+        }
+
         $statement = $this->pdo()->prepare('DELETE FROM messages WHERE id = :id');
         $statement->execute(['id' => $id]);
 

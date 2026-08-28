@@ -129,10 +129,19 @@ it('marks read, deletes rows with their directories and clears everything', func
     expect($this->store->find($a->id))->toBeNull()->and(is_dir($this->paths->message($a->id)))->toBeFalse();
 
     mkdir($this->paths->partsDir($b->id), 0755, true);
-    file_put_contents($this->paths->part($b->id, 'nested'), 'part');
+    file_put_contents($this->paths->part($b->id, '01ARZ3NDEKTSV4RRFFQ69G5FAV'), 'part');
     $this->store->clear();
     expect($this->store->count())->toBe(0)
         ->and(is_dir($this->paths->message($b->id)))->toBeFalse();
+});
+
+it('refuses to delete an invalid id without touching the filesystem', function () {
+    $sibling = $this->paths->root.DIRECTORY_SEPARATOR.'protected-sibling';
+    mkdir($sibling);
+
+    expect(fn () => $this->store->delete('../protected-sibling'))
+        ->toThrow(InvalidArgumentException::class, 'Invalid mailbox identifier.')
+        ->and(is_dir($sibling))->toBeTrue();
 });
 
 it('answers the maintenance queries', function () {

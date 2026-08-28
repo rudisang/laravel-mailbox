@@ -38,8 +38,6 @@ final class PartWriter
 
                 if ($filter === 'convert.base64-decode') {
                     $chunk = str_replace(["\r", "\n"], '', $chunk);
-                } elseif ($filter === 'convert.quoted-printable-decode') {
-                    $chunk = str_replace("\r\n", "\n", $chunk);
                 }
 
                 if ($chunk !== '' && fwrite($handle, $chunk) === false) {
