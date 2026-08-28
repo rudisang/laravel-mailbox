@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Mime;
 
 use RuntimeException;
 use Symfony\Component\Mime\Part\AbstractPart;
+use Symfony\Component\Mime\Part\MessagePart;
 use Throwable;
 
 final class PartWriter
@@ -14,7 +15,7 @@ final class PartWriter
     public static function write(AbstractPart $part, string $path): array
     {
         $headerBody = $part->getPreparedHeaders()->getHeaderBody('Content-Transfer-Encoding');
-        $encoding = is_string($headerBody) ? strtolower(trim($headerBody)) : '';
+        $encoding = is_string($headerBody) && ! $part instanceof MessagePart ? strtolower(trim($headerBody)) : '';
 
         $filter = match ($encoding) {
             'base64' => 'convert.base64-decode',
