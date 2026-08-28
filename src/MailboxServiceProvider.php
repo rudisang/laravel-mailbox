@@ -7,7 +7,14 @@ namespace Rudisang\Mailbox;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Foundation\Console\AboutCommand;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Mail\MailManager;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobFailed;
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Queue\Events\JobProcessing;
+use Illuminate\Queue\Queue;
 use Illuminate\Support\ServiceProvider;
 use Rudisang\Mailbox\Capture\ContextCollector;
 use Rudisang\Mailbox\Capture\FailureInjector;
@@ -23,6 +30,10 @@ use Rudisang\Mailbox\Transport\LocalTransportFactory;
 
 class MailboxServiceProvider extends ServiceProvider
 {
+    private mixed $previousNamespace = null;
+
+    private bool $namespaceOverridden = false;
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/mailbox.php', 'mailbox');
@@ -68,6 +79,41 @@ class MailboxServiceProvider extends ServiceProvider
         $mailManager->extend('local', function (array $config = []) {
             return $this->app->make(LocalTransportFactory::class)->make($config);
         });
+
+        if ($this->app->make(EnvironmentGuard::class)->allows()) {
+            $events = $this->app->make('events');
+            $events->listen(MessageSending::class, fn (MessageSending $event) => $this->app->make(ContextCollector::class)->rememberSending($event->message, $event->data));
+            $events->listen(MessageSent::class, fn () => $this->app->make(ContextCollector::class)->forgetSending());
+            $events->listen(JobProcessing::class, function (JobProcessing $event): void {
+                $collector = $this->app->make(ContextCollector::class);
+                $collector->jobStarted((string) $event->connectionName, $event->job);
+                $payload = $event->job->payload();
+
+                if (isset($payload['mailbox_namespace']) && is_string($payload['mailbox_namespace'])) {
+                    $config = $this->app->make('config');
+                    $this->previousNamespace = $config->get('mailbox.namespace');
+                    $config->set('mailbox.namespace', $payload['mailbox_namespace']);
+                    $this->namespaceOverridden = true;
+                }
+            });
+
+            foreach ([JobProcessed::class, JobFailed::class, JobExceptionOccurred::class] as $event) {
+                $events->listen($event, function (): void {
+                    $this->app->make(ContextCollector::class)->jobFinished();
+
+                    if ($this->namespaceOverridden) {
+                        $this->app->make('config')->set('mailbox.namespace', $this->previousNamespace);
+                        $this->namespaceOverridden = false;
+                    }
+                });
+            }
+
+            Queue::createPayloadUsing(function () {
+                $namespace = $this->app->make('config')->get('mailbox.namespace');
+
+                return is_string($namespace) && $namespace !== '' ? ['mailbox_namespace' => $namespace] : [];
+            });
+        }
 
         if ($this->app->runningInConsole()) {
             $this->publishes([
