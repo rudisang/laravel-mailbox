@@ -8,9 +8,7 @@ use Illuminate\Mail\Mailables\Envelope;
 
 class WelcomeMail extends Mailable
 {
-    public function __construct(public string $name = 'Ada')
-    {
-    }
+    public function __construct(public string $name = 'Ada') {}
 
     public function envelope(): Envelope
     {

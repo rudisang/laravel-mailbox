@@ -10,9 +10,7 @@ use Illuminate\Mail\Mailables\Envelope;
 
 class InvoiceMail extends Mailable
 {
-    public function __construct(public int $number = 123, public string $amount = 'R 1,250.00')
-    {
-    }
+    public function __construct(public int $number = 123, public string $amount = 'R 1,250.00') {}
 
     public function envelope(): Envelope
     {
