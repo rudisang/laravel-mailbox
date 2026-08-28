@@ -6,11 +6,12 @@ use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Storage\PartRecord;
+use Rudisang\Mailbox\Storage\Schema;
 use Rudisang\Mailbox\Support\StoragePaths;
 
 function makeRecord(array $overrides = []): MessageRecord
 {
-    $id = $overrides['id'] ?? strtoupper(substr(str_replace(['-', '.'], '', uniqid('', true)), 0, 26));
+    $id = $overrides['id'] ?? strtoupper(bin2hex(random_bytes(13)));
     $id = str_pad(preg_replace('/[^0-9A-HJKMNP-TV-Z]/', '0', $id), 26, '0');
 
     return MessageRecord::fromRow(array_merge([
@@ -57,6 +58,47 @@ afterEach(function () {
     exec('rm -rf '.escapeshellarg($this->paths->root));
 });
 
+it('records the current schema version for a fresh store', function () {
+    expect($this->store->schemaVersion())->toBe(Schema::version());
+});
+
+it('rebuilds stale schema tables and message directories', function () {
+    $pdo = $this->store->pdo();
+    $pdo->exec('ALTER TABLE messages ADD COLUMN stale_column TEXT NULL');
+    $pdo->exec("UPDATE mailbox_meta SET value = '0' WHERE key = 'schema_version'");
+    $stale = $this->paths->messagesDir().DIRECTORY_SEPARATOR.'stale-message';
+    mkdir($stale, 0700, true);
+    file_put_contents($stale.DIRECTORY_SEPARATOR.'raw.eml', 'stale');
+
+    $rebuilt = new MessageStore($this->paths, new MaintenanceLock($this->paths->lock()));
+    $columns = $rebuilt->pdo()->query('PRAGMA table_info(messages)')?->fetchAll() ?: [];
+
+    expect(array_column($columns, 'name'))->not->toContain('stale_column')
+        ->and(is_dir($stale))->toBeFalse()
+        ->and($rebuilt->schemaVersion())->toBe(Schema::version());
+});
+
+it('does not cache a pdo when the schema lock is unavailable', function () {
+    $lock = new class($this->paths->lock()) extends MaintenanceLock
+    {
+        public int $attempts = 0;
+
+        public function exclusive(callable $fn, bool $blocking = true): mixed
+        {
+            $this->attempts++;
+
+            return null;
+        }
+    };
+    $store = new MessageStore($this->paths, $lock);
+
+    expect(fn () => $store->pdo())
+        ->toThrow(RuntimeException::class, 'Mailbox schema could not be initialised (lock unavailable).');
+    expect(fn () => $store->pdo())
+        ->toThrow(RuntimeException::class, 'Mailbox schema could not be initialised (lock unavailable).')
+        ->and($lock->attempts)->toBe(2);
+});
+
 it('creates the schema lazily and inserts a message with parts', function () {
     $record = makeRecord();
     $part = PartRecord::fromRow(['id' => '01ARZ3NDEKTSV4RRFFQ69G5FAV', 'message_id' => $record->id, 'parent_id' => null, 'position' => 0, 'depth' => 0, 'content_type' => 'text/html; charset=utf-8', 'media_type' => 'text', 'media_subtype' => 'html', 'disposition' => null, 'filename' => null, 'content_id' => null, 'charset' => 'utf-8', 'transfer_encoding' => 'quoted-printable', 'decoded_bytes' => 10, 'sha256' => str_repeat('b', 64), 'is_inline' => 0, 'is_attachment' => 0]);
@@ -94,6 +136,16 @@ it('lists newest first, filters, searches and counts', function () {
         ->and($this->store->list(['limit' => 1, 'offset' => 1])[0]->subject)->toBe('Second')
         ->and($this->store->countSince(1, null))->toBe(2)
         ->and($this->store->countSince(2, 'ns-1'))->toBe(1);
+});
+
+it('searches lowercased unicode text with an uppercase query', function () {
+    $this->store->insert(makeRecord([
+        'subject' => 'Ünïcödé',
+        'search_text' => mb_strtolower('Ünïcödé', 'UTF-8'),
+    ]), []);
+
+    expect($this->store->list(['q' => 'ÜNÏCÖDÉ']))->toHaveCount(1)
+        ->and($this->store->count(['q' => 'ÜNÏCÖDÉ']))->toBe(1);
 });
 
 it('treats LIKE wildcard and escape characters as literal search text', function () {

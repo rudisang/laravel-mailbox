@@ -36,9 +36,8 @@ use Rudisang\Mailbox\Transport\LocalTransportFactory;
 
 class MailboxServiceProvider extends ServiceProvider
 {
-    private mixed $previousNamespace = null;
-
-    private bool $namespaceOverridden = false;
+    /** @var array<int, mixed> */
+    private array $previousNamespaces = [];
 
     public function register(): void
     {
@@ -105,21 +104,26 @@ class MailboxServiceProvider extends ServiceProvider
                 $collector->jobStarted((string) $event->connectionName, $event->job);
                 $payload = $event->job->payload();
 
-                if (isset($payload['mailbox_namespace']) && is_string($payload['mailbox_namespace'])) {
+                if (isset($payload['mailbox_namespace']) && is_string($payload['mailbox_namespace']) && $payload['mailbox_namespace'] !== '') {
                     $config = $this->app->make('config');
-                    $this->previousNamespace = $config->get('mailbox.namespace');
+                    $jobId = spl_object_id($event->job);
+
+                    if (! array_key_exists($jobId, $this->previousNamespaces)) {
+                        $this->previousNamespaces[$jobId] = $config->get('mailbox.namespace');
+                    }
+
                     $config->set('mailbox.namespace', $payload['mailbox_namespace']);
-                    $this->namespaceOverridden = true;
                 }
             });
 
             foreach ([JobProcessed::class, JobFailed::class, JobExceptionOccurred::class] as $event) {
-                $events->listen($event, function (): void {
-                    $this->app->make(ContextCollector::class)->jobFinished();
+                $events->listen($event, function (JobProcessed|JobFailed|JobExceptionOccurred $event): void {
+                    $this->app->make(ContextCollector::class)->jobFinishedFor($event->job);
+                    $jobId = spl_object_id($event->job);
 
-                    if ($this->namespaceOverridden) {
-                        $this->app->make('config')->set('mailbox.namespace', $this->previousNamespace);
-                        $this->namespaceOverridden = false;
+                    if (array_key_exists($jobId, $this->previousNamespaces)) {
+                        $this->app->make('config')->set('mailbox.namespace', $this->previousNamespaces[$jobId]);
+                        unset($this->previousNamespaces[$jobId]);
                     }
                 });
             }
@@ -138,11 +142,13 @@ class MailboxServiceProvider extends ServiceProvider
                 __DIR__.'/../config/mailbox.php' => $this->app->configPath('mailbox.php'),
             ], ['mailbox', 'mailbox-config']);
 
-            AboutCommand::add('Mailbox', fn () => [
-                'Enabled' => $this->app->make(EnvironmentGuard::class)->allows() ? 'Yes' : 'No ('.$this->app->make(EnvironmentGuard::class)->reason().')',
-                'Path' => '/'.trim((string) $this->app->make('config')->get('mailbox.path', '_mailbox'), '/'),
-                'Storage' => $this->app->make(StoragePaths::class)->root,
-            ]);
+            if (class_exists(AboutCommand::class)) {
+                AboutCommand::add('Mailbox', fn () => [
+                    'Enabled' => $this->app->make(EnvironmentGuard::class)->allows() ? 'Yes' : 'No ('.$this->app->make(EnvironmentGuard::class)->reason().')',
+                    'Path' => '/'.trim((string) $this->app->make('config')->get('mailbox.path', '_mailbox'), '/'),
+                    'Storage' => $this->app->make(StoragePaths::class)->root,
+                ]);
+            }
         }
     }
 }

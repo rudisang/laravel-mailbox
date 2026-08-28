@@ -15,15 +15,18 @@ final class LocalTransportFactory
     /** @param array<string, mixed> $config */
     public function make(array $config): LocalTransport
     {
-        $mailer = null;
+        $configuredName = $config['name'] ?? null;
+        $mailer = is_string($configuredName) && $configuredName !== '' ? $configuredName : null;
         $configuredTransport = $config;
         unset($configuredTransport['name']);
 
-        foreach ((array) $this->app->make('config')->get('mail.mailers', []) as $name => $candidate) {
-            if ($candidate === $config || $candidate === $configuredTransport) {
-                $mailer = (string) $name;
+        if ($mailer === null) {
+            foreach ((array) $this->app->make('config')->get('mail.mailers', []) as $name => $candidate) {
+                if ($candidate === $config || $candidate === $configuredTransport) {
+                    $mailer = (string) $name;
 
-                break;
+                    break;
+                }
             }
         }
 

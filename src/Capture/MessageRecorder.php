@@ -67,9 +67,15 @@ final class MessageRecorder
                 $this->limits->headerBytes,
             );
 
-            $extracted = $original instanceof Email
-                ? $this->extractor->extract($original, $tmp.DIRECTORY_SEPARATOR.'parts')
-                : ExtractedMessage::unsupported();
+            if ($original instanceof Email) {
+                try {
+                    $extracted = $this->extractor->extract($original, $tmp.DIRECTORY_SEPARATOR.'parts');
+                } catch (Throwable $exception) {
+                    $extracted = ExtractedMessage::failed('extract:'.get_debug_type($exception));
+                }
+            } else {
+                $extracted = ExtractedMessage::unsupported();
+            }
             $this->failures->check('after_extract');
 
             $context = $this->context->take($original, $mailer);
@@ -130,7 +136,7 @@ final class MessageRecorder
 
         try {
             $this->failures->check('in_prune');
-            $pruned = $this->pruner->prune(false);
+            $this->pruner->prune(false);
         } catch (Throwable) {
             // Pruning is best-effort after capture.
         }

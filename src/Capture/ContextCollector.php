@@ -24,8 +24,8 @@ final class ContextCollector
      */
     private ?array $sending = null;
 
-    /** @var array<string, string|null> */
-    private array $job = [];
+    /** @var array<int, array<string, string|null>> */
+    private array $jobs = [];
 
     /** @var array<string, string> */
     private array $appContext = [];
@@ -72,7 +72,7 @@ final class ContextCollector
     {
         $payload = $job->payload();
         $payloadUuid = $payload['uuid'] ?? null;
-        $this->job = [
+        $this->jobs[spl_object_id($job)] = [
             'job' => $job->resolveName(),
             'job_id' => $job->uuid() ?? (is_scalar($payloadUuid) ? (string) $payloadUuid : null),
             'queue' => $job->getQueue(),
@@ -82,7 +82,16 @@ final class ContextCollector
 
     public function jobFinished(): void
     {
-        $this->job = [];
+        $id = array_key_last($this->jobs);
+
+        if ($id !== null) {
+            unset($this->jobs[$id]);
+        }
+    }
+
+    public function jobFinishedFor(JobContract $job): void
+    {
+        unset($this->jobs[spl_object_id($job)]);
     }
 
     /** @param array<string, mixed> $scalars */
@@ -109,8 +118,9 @@ final class ContextCollector
     /** @return array<string, string|null> */
     public function take(RawMessage $original, ?string $mailer): array
     {
+        $job = $this->currentJob();
         $context = [
-            'runtime' => $this->job !== [] ? 'queue' : ($this->app->runningInConsole() ? 'console' : 'http'),
+            'runtime' => $job !== [] ? 'queue' : ($this->app->runningInConsole() ? 'console' : 'http'),
             'mailer' => $mailer,
             'environment' => (string) $this->app->environment(),
             'locale' => (string) $this->app->getLocale(),
@@ -144,7 +154,7 @@ final class ContextCollector
 
         $this->sending = null;
 
-        $context = array_merge($context, $this->job, $this->appContext);
+        $context = array_merge($context, $job, $this->appContext);
         $this->appContext = [];
 
         if ($this->redactor !== null) {
@@ -152,6 +162,14 @@ final class ContextCollector
         }
 
         return $this->bound($context);
+    }
+
+    /** @return array<string, string|null> */
+    private function currentJob(): array
+    {
+        $id = array_key_last($this->jobs);
+
+        return $id === null ? [] : $this->jobs[$id];
     }
 
     /**

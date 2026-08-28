@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Illuminate\Contracts\Queue\Job;
 use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Queue\Events\JobExceptionOccurred;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Mail;
@@ -54,6 +56,67 @@ it('records queue job context and takes the namespace from the job payload', fun
         ->and($list[1]->context['runtime'])->toBe('queue')
         ->and($list[0]->namespace)->toBe('outer')
         ->and($list[0]->context['job'])->toBeNull();
+});
+
+it('restores nested job namespace and context for the matching job', function () {
+    config()->set('mailbox.namespace', 'configured-ns');
+    $makeJob = static function (string $name, string $uuid, string $namespace): Job {
+        $job = Mockery::mock(Job::class);
+        $job->shouldReceive('payload')->andReturn([
+            'uuid' => $uuid,
+            'displayName' => $name,
+            'mailbox_namespace' => $namespace,
+        ]);
+        $job->shouldReceive('resolveName')->andReturn($name);
+        $job->shouldReceive('uuid')->andReturn($uuid);
+        $job->shouldReceive('getQueue')->andReturn('emails');
+
+        return $job;
+    };
+    $outer = $makeJob('App\\Jobs\\Outer', 'outer-job', 'outer-ns');
+    $inner = $makeJob('App\\Jobs\\Inner', 'inner-job', 'inner-ns');
+
+    event(new JobProcessing('sync', $outer));
+    event(new JobProcessing('sync', $inner));
+    mailboxSendOne('inner capture');
+    event(new JobProcessed('sync', $inner));
+    mailboxSendOne('outer capture');
+    event(new JobProcessed('sync', $outer));
+    mailboxSendOne('after jobs');
+
+    $list = app(MessageStore::class)->list();
+    expect($list[2]->namespace)->toBe('inner-ns')
+        ->and($list[2]->context['job'])->toBe('App\\Jobs\\Inner')
+        ->and($list[1]->namespace)->toBe('outer-ns')
+        ->and($list[1]->context['job'])->toBe('App\\Jobs\\Outer')
+        ->and($list[0]->namespace)->toBe('configured-ns')
+        ->and($list[0]->context['job'])->toBeNull();
+});
+
+it('ignores duplicate and unknown job completion events', function () {
+    config()->set('mailbox.namespace', 'configured-ns');
+    $outer = Mockery::mock(Job::class);
+    $outer->shouldReceive('payload')->andReturn(['uuid' => 'outer', 'mailbox_namespace' => 'outer-ns']);
+    $outer->shouldReceive('resolveName')->andReturn('Outer');
+    $outer->shouldReceive('uuid')->andReturn('outer');
+    $outer->shouldReceive('getQueue')->andReturn('emails');
+    $inner = Mockery::mock(Job::class);
+    $inner->shouldReceive('payload')->andReturn(['uuid' => 'inner', 'mailbox_namespace' => 'inner-ns']);
+    $inner->shouldReceive('resolveName')->andReturn('Inner');
+    $inner->shouldReceive('uuid')->andReturn('inner');
+    $inner->shouldReceive('getQueue')->andReturn('emails');
+    $exception = new RuntimeException('failed');
+
+    event(new JobProcessing('sync', $outer));
+    event(new JobProcessing('sync', $inner));
+    event(new JobExceptionOccurred('sync', $inner, $exception));
+    event(new JobFailed('sync', $inner, $exception));
+    mailboxSendOne('still outer');
+    event(new JobProcessed('sync', $outer));
+
+    $record = app(MessageStore::class)->list()[0];
+    expect($record->namespace)->toBe('outer-ns')
+        ->and($record->context['job'])->toBe('Outer');
 });
 
 it('adds the current namespace to queued job payloads', function () {

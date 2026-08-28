@@ -75,4 +75,14 @@ final class Schema
     {
         return 1;
     }
+
+    /** @return list<string> */
+    public static function dropStatements(): array
+    {
+        return [
+            'DROP TABLE IF EXISTS parts',
+            'DROP TABLE IF EXISTS messages',
+            'DROP TABLE IF EXISTS mailbox_meta',
+        ];
+    }
 }

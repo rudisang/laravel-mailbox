@@ -8,6 +8,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Rudisang\Mailbox\Http\InboxFilters;
+use Rudisang\Mailbox\Http\Routing;
 use Rudisang\Mailbox\Storage\MessageStore;
 
 final class InboxController
@@ -16,7 +18,7 @@ final class InboxController
 
     public function index(Request $request): View
     {
-        $filters = $this->filters($request);
+        $filters = InboxFilters::fromRequest($request)->toArray();
         $messages = $this->store->list($filters + ['limit' => 100]);
 
         if ($request->query('partial') === 'list') {
@@ -32,7 +34,7 @@ final class InboxController
             'filters' => $filters,
             'status' => $this->store->status(null),
             'detail' => null,
-            'basePath' => url(trim((string) config('mailbox.path', '_mailbox'), '/')),
+            'basePath' => Routing::basePath(),
             'selectedId' => null,
         ]);
     }
@@ -46,24 +48,5 @@ final class InboxController
         }
 
         return redirect()->route('mailbox.inbox');
-    }
-
-    /** @return array{q: string, unread: bool, attachments: bool, issues: bool} */
-    private function filters(Request $request): array
-    {
-        $query = $request->query('q');
-        $query = is_string($query) ? mb_substr(trim($query), 0, 200) : '';
-
-        return [
-            'q' => $query,
-            'unread' => $this->boolean($request->query('unread')),
-            'attachments' => $this->boolean($request->query('attachments')),
-            'issues' => $this->boolean($request->query('issues')),
-        ];
-    }
-
-    private function boolean(mixed $value): bool
-    {
-        return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
     }
 }

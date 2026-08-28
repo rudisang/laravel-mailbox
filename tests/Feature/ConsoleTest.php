@@ -7,7 +7,9 @@ use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 
 it('doctor reports healthy state and exits 0', function () {
-    $this->artisan('mailbox:doctor')->expectsOutputToContain('Environment')->assertExitCode(0);
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Schema","detail":"Version 1."')
+        ->assertExitCode(0);
 });
 
 it('doctor reports a mailer collision, failover composition and production as critical', function () {
@@ -18,6 +20,14 @@ it('doctor reports a mailer collision, failover composition and production as cr
 
     $this->app['env'] = 'production';
     $this->artisan('mailbox:doctor', ['--json' => true])->assertExitCode(1);
+});
+
+it('doctor reports an unreadable schema version as critical', function () {
+    app(MessageStore::class)->pdo()->exec("UPDATE mailbox_meta SET value = 'invalid' WHERE key = 'schema_version'");
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Schema","detail":"Unable to read mailbox schema version: Mailbox schema version could not be read."')
+        ->assertExitCode(1);
 });
 
 it('doctor --repair removes orphans', function () {

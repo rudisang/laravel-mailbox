@@ -9,11 +9,6 @@ use Rudisang\Mailbox\Storage\Pruner;
 use Rudisang\Mailbox\Storage\Repair;
 use Rudisang\Mailbox\Support\StoragePaths;
 
-function sendOne(string $subject): void
-{
-    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject($subject)->text('x'));
-}
-
 it('prunes by count with one-message slack and removes directories', function () {
     config()->set('mailbox.retention.max_messages', 3);
     $this->app->forgetInstance(Pruner::class);
@@ -21,20 +16,21 @@ it('prunes by count with one-message slack and removes directories', function ()
     Mail::purge('local');
 
     foreach (range(1, 6) as $i) {
-        sendOne("m{$i}");
+        mailboxSendOne("m{$i}");
     }
     $store = app(MessageStore::class);
 
-    expect($store->count())->toBeLessThanOrEqual(4)
+    expect($store->count())->toBeGreaterThanOrEqual(3)
+        ->toBeLessThanOrEqual(4)
         ->and($store->list()[0]->subject)->toBe('m6')
         ->and(count(glob(app(StoragePaths::class)->messagesDir().'/*') ?: []))->toBe($store->count());
 });
 
 it('prunes by age', function () {
-    sendOne('old');
+    mailboxSendOne('old');
     $store = app(MessageStore::class);
     $store->pdo()->exec("UPDATE messages SET captured_at = '2020-01-01T00:00:00Z'");
-    sendOne('new');
+    mailboxSendOne('new');
 
     expect(array_map(fn ($m) => $m->subject, $store->list()))->toBe(['new']);
 });
@@ -46,14 +42,17 @@ it('prunes by total bytes', function () {
     Mail::purge('local');
 
     foreach (range(1, 8) as $i) {
-        sendOne('bytes'.$i);
+        mailboxSendOne('bytes'.$i);
     }
 
-    expect(app(MessageStore::class)->totals()['bytes'])->toBeLessThan(2000 + 1500);
+    $totals = app(MessageStore::class)->totals();
+
+    expect($totals['bytes'])->toBeGreaterThan(0)->toBeLessThan(2000 + 1500)
+        ->and($totals['count'])->toBeGreaterThanOrEqual(1);
 });
 
 it('scans and repairs orphan directories, dangling rows and stale tmp', function () {
-    sendOne('keep');
+    mailboxSendOne('keep');
     $paths = app(StoragePaths::class);
     $store = app(MessageStore::class);
     $keep = $store->list()[0]->id;
@@ -61,7 +60,7 @@ it('scans and repairs orphan directories, dangling rows and stale tmp', function
     mkdir($paths->tmpDir().DIRECTORY_SEPARATOR.'01STALE000000000000000000A', 0755, true);
     touch($paths->tmpDir().DIRECTORY_SEPARATOR.'01STALE000000000000000000A', time() - 3600);
     mkdir($paths->tmpDir().DIRECTORY_SEPARATOR.'01FRESH000000000000000000A', 0755, true);
-    sendOne('dangling');
+    mailboxSendOne('dangling');
     $dangling = $store->list()[0]->id;
     MessageStore::removeDirectory($paths->message($dangling));
 

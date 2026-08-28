@@ -3,21 +3,13 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Rudisang\Mailbox\MailboxServiceProvider;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\Assets;
 
-function capture(string $subject = 'Route test'): string
-{
-    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject($subject)->html('<p>'.$subject.'</p>')->text($subject));
-
-    return app(MessageStore::class)->list()[0]->id;
-}
-
 it('serves the inbox with security headers', function () {
-    capture('Inbox subject');
+    mailboxCapture('Inbox subject');
 
     $response = $this->get('/_mailbox');
 
@@ -28,16 +20,16 @@ it('serves the inbox with security headers', function () {
 });
 
 it('returns fragments for partial requests', function () {
-    $id = capture('Fragment');
+    $id = mailboxCapture('Fragment');
 
-    $this->get('/_mailbox?partial=list')->assertOk()->assertSee('Fragment')->assertDontSee('<html');
-    $this->get('/_mailbox/messages/'.$id.'?partial=detail')->assertOk()->assertSee('Fragment')->assertDontSee('<html');
+    $this->get('/_mailbox?partial=list')->assertOk()->assertSee('Fragment')->assertDontSee('<html', false);
+    $this->get('/_mailbox/messages/'.$id.'?partial=detail')->assertOk()->assertSee('Fragment')->assertDontSee('<html', false);
     $this->get('/_mailbox/messages/'.$id)->assertOk()->assertSee('<html', false);
     expect(app(MessageStore::class)->find($id)->isRead())->toBeTrue();
 });
 
 it('renders the progressive enhancement DOM contract', function () {
-    $id = capture('DOM contract');
+    $id = mailboxCapture('DOM contract');
     $response = $this->get('/_mailbox/messages/'.$id);
 
     $response->assertOk()
@@ -67,17 +59,17 @@ it('renders the progressive enhancement DOM contract', function () {
 });
 
 it('searches and filters', function () {
-    capture('Alpha one');
-    capture('Beta two');
+    mailboxCapture('Alpha one');
+    mailboxCapture('Beta two');
 
     $this->get('/_mailbox?q=beta')->assertSee('Beta two')->assertDontSee('Alpha one');
     $this->get('/_mailbox?unread=1')->assertSee('Alpha one');
 });
 
 it('404s outside allowed environments and for unknown or malformed ids', function () {
-    $id = capture();
+    $id = mailboxCapture();
     $this->get('/_mailbox/messages/not-a-ulid')->assertNotFound();
-    $this->get('/_mailbox/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV')->assertNotFound();
+    $this->get('/_mailbox/messages/01ARZ3NDEKTSV4RRFFQ69G5FAV')->assertNotFound()->assertSee('Message not found');
 
     $this->app['env'] = 'production';
     $this->get('/_mailbox')->assertNotFound();
@@ -91,20 +83,82 @@ it('applies the viewMailbox gate when defined', function () {
 });
 
 it('toggles read state, deletes and clears with CSRF protection', function () {
-    $id = capture();
+    $id = mailboxCapture();
     $store = app(MessageStore::class);
 
-    $this->post('/_mailbox/messages/'.$id.'/read', ['read' => false])->assertRedirect();
+    $this->post('/_mailbox/messages/'.$id.'/read', ['read' => false])->assertRedirect(route('mailbox.message', $id));
     expect($store->find($id)->isRead())->toBeFalse();
 
     $this->postJson('/_mailbox/messages/'.$id.'/read', ['read' => true])->assertOk()->assertJson(['read' => true]);
     $this->delete('/_mailbox/messages/'.$id)->assertRedirect('/_mailbox');
     expect($store->find($id))->toBeNull();
 
-    capture();
-    capture();
+    mailboxCapture();
+    mailboxCapture();
     $this->post('/_mailbox/clear')->assertRedirect('/_mailbox');
     expect($store->count())->toBe(0);
+});
+
+it('validates read input and returns json mutation results', function () {
+    $id = mailboxCapture('JSON mutations');
+
+    $this->postJson('/_mailbox/messages/'.$id.'/read', ['read' => 'maybe'])->assertUnprocessable();
+    $this->deleteJson('/_mailbox/messages/'.$id)->assertOk()->assertJson(['deleted' => true]);
+
+    mailboxCapture('Clear one');
+    mailboxCapture('Clear two');
+    $this->postJson('/_mailbox/clear')->assertOk()->assertJson(['cleared' => true]);
+    expect(app(MessageStore::class)->count())->toBe(0);
+});
+
+it('streams raw messages inline and as downloads and 404s when raw is missing', function () {
+    $id = mailboxCapture('Raw route');
+    $inline = $this->get('/_mailbox/messages/'.$id.'/raw');
+
+    $inline->assertOk()
+        ->assertHeader('Content-Type', 'text/plain; charset=us-ascii')
+        ->assertHeader('Content-Length', (string) filesize(mailboxPaths()->raw($id)))
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeaderMissing('Content-Security-Policy');
+    expect($inline->streamedContent())->toContain('Subject: Raw route');
+
+    $download = $this->get('/_mailbox/messages/'.$id.'/raw?download=1');
+    $download->assertOk()->assertHeader('Content-Disposition', 'attachment; filename='.$id.'.eml');
+    expect($download->streamedContent())->toContain('Subject: Raw route');
+
+    unlink(mailboxPaths()->raw($id));
+    $this->get('/_mailbox/messages/'.$id.'/raw')->assertNotFound();
+});
+
+it('keeps response-specific headers on preview part raw asset and status routes', function () {
+    $id = mailboxCapture('Header exclusions');
+    $part = array_values(array_filter(
+        app(MessageStore::class)->parts($id),
+        static fn ($candidate): bool => $candidate->isLeaf(),
+    ))[0];
+
+    $preview = $this->get('/_mailbox/messages/'.$id.'/preview/html');
+    $preview->assertOk();
+    expect($preview->headers->get('Cache-Control'))->toContain('no-store');
+    expect($preview->headers->get('Content-Security-Policy'))
+        ->toContain("default-src 'none'")
+        ->not->toContain("script-src 'self'");
+
+    $partResponse = $this->get('/_mailbox/messages/'.$id.'/parts/'.$part->id);
+    $partResponse->assertOk()->assertHeader('Cache-Control', 'max-age=3600, private');
+    expect($partResponse->headers->get('Content-Security-Policy'))->toBe("default-src 'none'; sandbox");
+
+    $raw = $this->get('/_mailbox/messages/'.$id.'/raw');
+    $raw->assertOk()->assertHeaderMissing('Content-Security-Policy');
+    $raw->streamedContent();
+
+    $asset = $this->get('/_mailbox/assets/mailbox.css');
+    $asset->assertOk()->assertHeaderMissing('Content-Security-Policy');
+    expect($asset->headers->get('Cache-Control'))->not->toContain('no-store');
+
+    $status = $this->get('/_mailbox/api/status');
+    $status->assertOk();
+    expect($status->headers->get('Cache-Control'))->not->toContain('no-store');
 });
 
 it('rejects mutations without a csrf token when the web middleware is active', function () {
@@ -115,13 +169,13 @@ it('rejects mutations without a csrf token when the web middleware is active', f
 });
 
 it('reports status with etag support', function () {
-    capture();
+    mailboxCapture();
     $first = $this->get('/_mailbox/api/status');
     $first->assertOk()->assertJson(['seq' => 1, 'total' => 1, 'unread' => 1]);
     $etag = $first->headers->get('ETag');
 
     $this->get('/_mailbox/api/status', ['If-None-Match' => $etag])->assertStatus(304);
-    capture();
+    mailboxCapture();
     $this->get('/_mailbox/api/status', ['If-None-Match' => $etag])->assertOk()->assertJson(['seq' => 2]);
 });
 

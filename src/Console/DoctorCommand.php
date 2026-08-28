@@ -91,6 +91,7 @@ final class DoctorCommand extends Command
             $this->failoverFinding(),
             $this->storageFinding(),
             $this->sqliteFinding(),
+            $this->schemaFinding(),
             $this->configCacheFinding(),
             $this->routeCacheFinding(),
             $this->retentionFinding(),
@@ -187,6 +188,16 @@ final class DoctorCommand extends Command
             );
         } catch (Throwable $exception) {
             return $this->finding('critical', 'SQLite', 'SQLite unavailable: '.$exception->getMessage());
+        }
+    }
+
+    /** @return array{level: 'ok'|'warning'|'critical', label: string, detail: string} */
+    private function schemaFinding(): array
+    {
+        try {
+            return $this->finding('ok', 'Schema', 'Version '.$this->store->schemaVersion().'.');
+        } catch (Throwable $exception) {
+            return $this->finding('critical', 'Schema', 'Unable to read mailbox schema version: '.$exception->getMessage());
         }
     }
 

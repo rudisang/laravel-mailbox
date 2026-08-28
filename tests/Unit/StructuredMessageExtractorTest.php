@@ -89,7 +89,9 @@ it('records calendar parts', function () {
 it('keeps bcc as a separate semantic fact', function () {
     $m = $this->extractor->extract(Emails::bccOnly(), $this->dir);
 
-    expect($m->bcc)->toBe([['address' => 'hidden@example.com', 'name' => 'Hidden']])->and($m->to)->toBe([]);
+    expect($m->bcc)->toBe([['address' => 'hidden@example.com', 'name' => 'Hidden']])
+        ->and($m->to)->toBe([])
+        ->and($m->searchText)->not->toContain('hidden@example.com');
 });
 
 it('collects tags and metadata headers', function () {

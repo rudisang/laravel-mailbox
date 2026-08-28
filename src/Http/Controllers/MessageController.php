@@ -8,7 +8,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Rudisang\Mailbox\Http\InboxFilters;
 use Rudisang\Mailbox\Http\MessagePresenter;
+use Rudisang\Mailbox\Http\Routing;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,12 +23,12 @@ final class MessageController
         private readonly StoragePaths $paths,
     ) {}
 
-    public function show(Request $request, string $id): View
+    public function show(Request $request, string $id): View|Response
     {
         $detail = $this->presenter->detail($id);
 
         if ($detail === null) {
-            abort(404);
+            return response()->view('mailbox::errors.404', [], 404);
         }
 
         $this->store->markRead($id, true);
@@ -36,7 +38,7 @@ final class MessageController
             return view()->make('mailbox::partials.detail', ['detail' => $detail, 'raw' => $raw]);
         }
 
-        $filters = $this->filters($request);
+        $filters = InboxFilters::fromRequest($request)->toArray();
 
         return view()->make('mailbox::inbox', [
             'messages' => $this->store->list($filters + ['limit' => 100]),
@@ -44,7 +46,7 @@ final class MessageController
             'status' => $this->store->status(null),
             'detail' => $detail,
             'raw' => $raw,
-            'basePath' => url(trim((string) config('mailbox.path', '_mailbox'), '/')),
+            'basePath' => Routing::basePath(),
             'selectedId' => $id,
         ]);
     }
@@ -78,13 +80,16 @@ final class MessageController
             $headers['Content-Disposition'] = 'attachment; filename='.$id.'.eml';
         }
 
-        $contents = file_get_contents($path);
+        return response()->stream(static function () use ($path): void {
+            $handle = fopen($path, 'rb');
 
-        if ($contents === false) {
-            abort(404);
-        }
+            if ($handle === false) {
+                return;
+            }
 
-        return response($contents, 200, $headers);
+            fpassthru($handle);
+            fclose($handle);
+        }, 200, $headers);
     }
 
     public function read(Request $request, string $id): JsonResponse|RedirectResponse
@@ -108,7 +113,7 @@ final class MessageController
             return response()->json(['read' => $read]);
         }
 
-        return redirect()->back();
+        return redirect()->route('mailbox.message', $id);
     }
 
     public function destroy(Request $request, string $id): JsonResponse|RedirectResponse
@@ -124,24 +129,6 @@ final class MessageController
         }
 
         return redirect()->route('mailbox.inbox');
-    }
-
-    /** @return array{q: string, unread: bool, attachments: bool, issues: bool} */
-    private function filters(Request $request): array
-    {
-        $query = $request->query('q');
-
-        return [
-            'q' => is_string($query) ? mb_substr(trim($query), 0, 200) : '',
-            'unread' => $this->boolean($request->query('unread')),
-            'attachments' => $this->boolean($request->query('attachments')),
-            'issues' => $this->boolean($request->query('issues')),
-        ];
-    }
-
-    private function boolean(mixed $value): bool
-    {
-        return filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? false;
     }
 
     private function rawPreview(string $id): string

@@ -9,6 +9,7 @@ use PDO;
 use PDOException;
 use PDOStatement;
 use Rudisang\Mailbox\Support\StoragePaths;
+use RuntimeException;
 use Throwable;
 
 final class MessageStore
@@ -37,13 +38,41 @@ final class MessageStore
         $pdo->exec('PRAGMA synchronous = FULL');
         $pdo->exec('PRAGMA foreign_keys = ON');
 
-        $this->lock->exclusive(function () use ($pdo): void {
+        $initialised = $this->lock->exclusive(function () use ($pdo): bool {
             foreach (Schema::statements() as $sql) {
                 $pdo->exec($sql);
             }
+
+            if ($this->readSchemaVersion($pdo) !== Schema::version()) {
+                // This development-only store uses destructive schema upgrades instead of migrations.
+                foreach (Schema::dropStatements() as $sql) {
+                    $pdo->exec($sql);
+                }
+
+                $this->removeDirectories($this->paths->messagesDir());
+                $this->removeDirectories($this->paths->tmpDir());
+
+                foreach (Schema::statements() as $sql) {
+                    $pdo->exec($sql);
+                }
+
+                $statement = $pdo->prepare("INSERT OR REPLACE INTO mailbox_meta (key, value) VALUES ('schema_version', :version)");
+                $statement->execute(['version' => (string) Schema::version()]);
+            }
+
+            return true;
         });
 
+        if ($initialised !== true) {
+            throw new RuntimeException('Mailbox schema could not be initialised (lock unavailable).');
+        }
+
         return $this->pdo = $pdo;
+    }
+
+    public function schemaVersion(): int
+    {
+        return $this->readSchemaVersion($this->pdo());
     }
 
     /**
@@ -339,6 +368,7 @@ final class MessageStore
         $query = $filters['q'] ?? null;
 
         if (is_string($query) && $query !== '') {
+            $query = mb_strtolower($query, 'UTF-8');
             $clauses[] = "(subject LIKE :q ESCAPE '\\' OR search_text LIKE :q ESCAPE '\\' OR message_id LIKE :q ESCAPE '\\')";
             $parameters['q'] = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $query).'%';
         }
@@ -363,6 +393,40 @@ final class MessageStore
         }
 
         return [$clauses === [] ? '' : ' WHERE '.implode(' AND ', $clauses), $parameters];
+    }
+
+    private function readSchemaVersion(PDO $pdo): int
+    {
+        $statement = $pdo->prepare("SELECT value FROM mailbox_meta WHERE key = 'schema_version' LIMIT 1");
+        $statement->execute();
+        $value = $statement->fetchColumn();
+
+        if (! is_string($value) || filter_var($value, FILTER_VALIDATE_INT) === false) {
+            throw new RuntimeException('Mailbox schema version could not be read.');
+        }
+
+        return (int) $value;
+    }
+
+    private function removeDirectories(string $directory): void
+    {
+        $entries = @scandir($directory);
+
+        if ($entries === false) {
+            return;
+        }
+
+        foreach ($entries as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+
+            $path = $directory.DIRECTORY_SEPARATOR.$entry;
+
+            if (is_dir($path) || is_link($path)) {
+                self::removeDirectory($path);
+            }
+        }
     }
 
     /** @return list<MessageRecord> */

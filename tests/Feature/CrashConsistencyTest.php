@@ -36,5 +36,6 @@ it('leaves either a complete visible capture or a repairable invisible orphan at
         }
 
         expect(app(Repair::class)->scan()['orphan_dirs'])->toBe([], "stage {$stage} left an orphan dir");
+        expect(glob($paths->tmpDir().'/*') ?: [])->toBe([], "stage {$stage} left a tmp entry");
     }
 });

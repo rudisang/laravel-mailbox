@@ -59,4 +59,27 @@ final readonly class ExtractedMessage
             0,
         );
     }
+
+    public static function failed(string $error): self
+    {
+        return new self(
+            null,
+            [],
+            [],
+            [],
+            [],
+            [],
+            null,
+            null,
+            [],
+            [],
+            [],
+            null,
+            null,
+            'failed',
+            substr($error, 0, 120),
+            0,
+            0,
+        );
+    }
 }

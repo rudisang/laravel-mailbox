@@ -19,7 +19,7 @@ use Symfony\Component\Mime\Part\MessagePart;
 use Symfony\Component\Mime\Part\TextPart;
 use Throwable;
 
-final class StructuredMessageExtractor
+class StructuredMessageExtractor
 {
     public function __construct(private readonly Limits $limits) {}
 
@@ -40,7 +40,6 @@ final class StructuredMessageExtractor
             ...AddressNormalizer::emails($fromAddresses),
             ...AddressNormalizer::emails($toAddresses),
             ...AddressNormalizer::emails($ccAddresses),
-            ...AddressNormalizer::emails($bccAddresses),
             ...AddressNormalizer::emails($replyToAddresses),
         ];
         [$tags, $metadata] = $this->headerFacts($email);
@@ -348,6 +347,6 @@ final class StructuredMessageExtractor
         $bounded = substr(implode(' ', $values), 0, $this->limits->searchTextBytes);
         $validUtf8 = mb_convert_encoding($bounded, 'UTF-8', 'UTF-8');
 
-        return strtolower(mb_strcut($validUtf8, 0, $this->limits->searchTextBytes, 'UTF-8'));
+        return mb_strtolower(mb_strcut($validUtf8, 0, $this->limits->searchTextBytes, 'UTF-8'), 'UTF-8');
     }
 }

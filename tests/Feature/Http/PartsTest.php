@@ -52,6 +52,11 @@ it('serves raw source inline and as a download', function () {
     Mail::to('b@example.com')->send(new InvoiceMail(2));
     $id = app(MessageStore::class)->list()[0]->id;
 
-    $this->get('/_mailbox/messages/'.$id.'/raw')->assertOk()->assertHeader('Content-Type', 'text/plain; charset=us-ascii')->assertSee('Subject: Your invoice #2');
-    expect($this->get('/_mailbox/messages/'.$id.'/raw?download=1')->headers->get('Content-Disposition'))->toBe('attachment; filename='.$id.'.eml');
+    $inline = $this->get('/_mailbox/messages/'.$id.'/raw');
+    $inline->assertOk()->assertHeader('Content-Type', 'text/plain; charset=us-ascii');
+    expect($inline->streamedContent())->toContain('Subject: Your invoice #2');
+
+    $download = $this->get('/_mailbox/messages/'.$id.'/raw?download=1');
+    expect($download->headers->get('Content-Disposition'))->toBe('attachment; filename='.$id.'.eml')
+        ->and($download->streamedContent())->toContain('Subject: Your invoice #2');
 });
