@@ -42,6 +42,7 @@
 
     /* elevation: hairlines in light, soft shadow in dark */
     --mb-shadow: none;
+    --mb-shadow-seg: 0 1px 2px rgba(10, 10, 10, 0.08);
     --mb-shadow-pop: 0 1px 2px rgba(10, 10, 10, 0.06), 0 12px 32px rgba(10, 10, 10, 0.12);
     --mb-scrim: rgba(10, 10, 10, 0.32);
 
@@ -99,6 +100,7 @@
     --mb-focus: #fafafa;
     --mb-focus-ring: 0 0 0 2px var(--mb-canvas);
     --mb-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.5);
+    --mb-shadow-seg: 0 1px 2px rgba(0, 0, 0, 0.6);
     --mb-shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.6), 0 24px 60px rgba(0, 0, 0, 0.6);
     --mb-scrim: rgba(0, 0, 0, 0.62);
 }
@@ -128,6 +130,7 @@
         --mb-danger-bg: rgba(255, 133, 119, 0.1);
         --mb-focus: #fafafa;
         --mb-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 2px 12px rgba(0, 0, 0, 0.5);
+        --mb-shadow-seg: 0 1px 2px rgba(0, 0, 0, 0.6);
         --mb-shadow-pop: 0 2px 8px rgba(0, 0, 0, 0.6), 0 24px 60px rgba(0, 0, 0, 0.6);
         --mb-scrim: rgba(0, 0, 0, 0.62);
     }
@@ -491,11 +494,11 @@ svg.mb-i-sm {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: 0;
-    border-radius: 7px;
+    border-radius: 8px;
     background: transparent;
     color: var(--mb-muted);
     cursor: pointer;
@@ -1067,12 +1070,7 @@ svg.mb-i-sm {
 .mb-seg[aria-pressed="true"] {
     background: var(--mb-raised);
     color: var(--mb-ink);
-    box-shadow: 0 1px 2px rgba(10, 10, 10, 0.08);
-}
-
-[data-theme="dark"] .mb-seg[aria-selected="true"],
-[data-theme="dark"] .mb-seg[aria-pressed="true"] {
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    box-shadow: var(--mb-shadow-seg);
 }
 
 .mb-tabbar {
@@ -1114,6 +1112,27 @@ svg.mb-i-sm {
 }
 
 .mb-panel[hidden] {
+    display: none;
+}
+
+.mb-panel__title {
+    display: none;
+}
+
+html:not([data-js]) .mb-panel__title {
+    display: block;
+    margin-bottom: var(--mb-3);
+    padding-bottom: var(--mb-2);
+    border-bottom: 1px solid var(--mb-hairline);
+    color: var(--mb-muted);
+    font-size: var(--mb-fs-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+html:not([data-js]) .mb-tablist,
+html:not([data-js]) [data-viewport-group] {
     display: none;
 }
 

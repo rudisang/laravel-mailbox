@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="data:,">
     <title>Mailbox</title>
     <link rel="stylesheet" href="{{ \Rudisang\Mailbox\Support\Assets::url('mailbox.css') }}">
 </head>
@@ -59,7 +60,7 @@
     </header>
 
     <noscript>
-        <p class="mb-noscript">JavaScript is off. Every link and button still works — live updates, keyboard shortcuts and the theme switch are unavailable.</p>
+        <p class="mb-noscript">JavaScript is off. Every link and form still works: messages open as full pages and each message shows all of its sections at once. Live updates, keyboard shortcuts, tabs, viewport presets and the theme switch need JavaScript.</p>
     </noscript>
 
     <main class="mb-shell" data-pane="{{ ($selectedId ?? null) ? 'detail' : 'list' }}">

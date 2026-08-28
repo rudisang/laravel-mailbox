@@ -14,9 +14,6 @@
 
 @php($mailboxAddress = fn (array $address): string => $address['name'] !== '' ? $address['name'].' <'.$address['address'].'>' : $address['address'])
 
-{{-- MessageController::show() marks the message read immediately after presenting it, so the record snapshot below can still report "unread". The workbench always renders a read message. --}}
-@php($isRead = true)
-
 @php($issueCount = count(array_filter($detail->diagnostics['results'], fn (array $result): bool => $result['severity'] !== 'info')))
 
 <article class="mb-detail" data-detail-root data-viewport-mode="full">
@@ -88,9 +85,9 @@
         <div class="mb-toolbar mb-toolbar--card" role="group" aria-label="Message actions">
             <form method="POST" action="{{ $detail->urls['read'] }}" data-action="read">
                 @csrf
-                <input type="hidden" name="read" value="{{ $isRead ? '0' : '1' }}">
+                <input type="hidden" name="read" value="{{ $detail->record->isRead() ? '0' : '1' }}">
                 <button type="submit" class="mb-btn mb-btn--outline mb-btn--sm">
-                    <span data-read-label>{{ $isRead ? 'Mark unread' : 'Mark read' }}</span>
+                    <span data-read-label>{{ $detail->record->isRead() ? 'Mark unread' : 'Mark read' }}</span>
                 </button>
             </form>
 
@@ -133,6 +130,8 @@
     </div>
 
     <section class="mb-panel" role="tabpanel" id="tab-html" aria-labelledby="tab-btn-html" tabindex="0">
+        <h2 class="mb-panel__title">HTML preview</h2>
+
         @if ($issueCount > 0)
             <p class="mb-notice">This preview is sanitised and sandboxed. {{ $issueCount }} {{ \Illuminate\Support\Str::plural('finding', $issueCount) }} in Diagnostics.</p>
         @endif
@@ -148,7 +147,9 @@
         @endif
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-text" aria-labelledby="tab-btn-text" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-text" aria-labelledby="tab-btn-text" tabindex="0">
+        <h2 class="mb-panel__title">Text body</h2>
+
         @if ($detail->text !== null)
             <div class="mb-device">
                 <div class="mb-device__screen">
@@ -160,7 +161,9 @@
         @endif
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-headers" aria-labelledby="tab-btn-headers" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-headers" aria-labelledby="tab-btn-headers" tabindex="0">
+        <h2 class="mb-panel__title">Headers</h2>
+
         <div class="mb-table-wrap mb-scroll">
             <table class="mb-table">
                 <thead><tr><th scope="col">Header</th><th scope="col">Value</th></tr></thead>
@@ -173,7 +176,9 @@
         </div>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-envelope" aria-labelledby="tab-btn-envelope" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-envelope" aria-labelledby="tab-btn-envelope" tabindex="0">
+        <h2 class="mb-panel__title">Envelope</h2>
+
         <dl class="mb-kv">
             <dt>Envelope sender</dt><dd class="mb-mono">{{ $record->envelopeSender ?? 'None' }}</dd>
             <dt>Envelope recipients</dt><dd class="mb-mono">{{ $record->envelopeRecipients === [] ? 'None' : implode(', ', $record->envelopeRecipients) }}</dd>
@@ -184,7 +189,9 @@
         </dl>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-mime" aria-labelledby="tab-btn-mime" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-mime" aria-labelledby="tab-btn-mime" tabindex="0">
+        <h2 class="mb-panel__title">MIME structure</h2>
+
         <ol class="mb-mime-tree" role="list">
             @foreach ($detail->mimeTree as $node)
                 <li data-depth="{{ $node['depth'] }}">{{ $node['label'] }}</li>
@@ -192,12 +199,16 @@
         </ol>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-raw" aria-labelledby="tab-btn-raw" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-raw" aria-labelledby="tab-btn-raw" tabindex="0">
+        <h2 class="mb-panel__title">Raw message</h2>
+
         <pre class="mb-code mb-scroll">{{ \Illuminate\Support\Str::limit($raw ?? '', 256 * 1024) }}</pre>
         <p class="mb-panel__foot"><a class="mb-btn mb-btn--outline mb-btn--sm" href="{{ $detail->urls['raw'] }}">View full raw message</a></p>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-attachments" aria-labelledby="tab-btn-attachments" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-attachments" aria-labelledby="tab-btn-attachments" tabindex="0">
+        <h2 class="mb-panel__title">Attachments</h2>
+
         <ol class="mb-attachments" role="list">
             @forelse ($detail->attachments as $attachment)
                 <li class="mb-attachment">
@@ -214,7 +225,9 @@
         </ol>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-links" aria-labelledby="tab-btn-links" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-links" aria-labelledby="tab-btn-links" tabindex="0">
+        <h2 class="mb-panel__title">Links</h2>
+
         <div class="mb-table-wrap mb-scroll">
             <table class="mb-table">
                 <thead><tr><th scope="col">Text</th><th scope="col">URL</th><th scope="col">Action</th></tr></thead>
@@ -239,7 +252,9 @@
         </div>
     </section>
 
-    <section class="mb-panel" role="tabpanel" id="tab-diagnostics" aria-labelledby="tab-btn-diagnostics" tabindex="0" hidden>
+    <section class="mb-panel" role="tabpanel" id="tab-diagnostics" aria-labelledby="tab-btn-diagnostics" tabindex="0">
+        <h2 class="mb-panel__title">Diagnostics</h2>
+
         <p class="mb-rules-version">Rules version {{ $detail->diagnostics['rules_version'] }}</p>
         <ol class="mb-diagnostics" role="list">
             @forelse ($detail->diagnostics['results'] as $result)

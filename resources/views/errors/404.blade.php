@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
+    <link rel="icon" href="data:,">
     <title>Message not found — Mailbox</title>
     <link rel="stylesheet" href="{{ \Rudisang\Mailbox\Support\Assets::url('mailbox.css') }}">
 </head>

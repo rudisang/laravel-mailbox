@@ -17,6 +17,14 @@ const searchForm = document.querySelector('form[data-search]');
 const searchInput = document.getElementById('mailbox-search');
 
 const ID = /\/messages\/([0-9A-HJKMNP-TV-Z]{26})/;
+const FALLBACK_EMPTY =
+    '<section class="mb-empty" aria-labelledby="mailbox-empty-title">' +
+    '<span class="mb-empty__mark" aria-hidden="true">' +
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M3 7.5 12 13l9-5.5"/><rect x="3" y="5" width="18" height="14" rx="2.5"/></svg></span>' +
+    '<h1 id="mailbox-empty-title">Nothing selected</h1>' +
+    '<p>Choose a message on the left to read it, inspect its headers, MIME tree and diagnostics.</p>' +
+    '</section>';
 const PREVIEW_TABS = ['html', 'text'];
 
 let seq = Number(body.dataset.mailboxSeq || '0') || 0;
@@ -138,19 +146,52 @@ function setUnread(count) {
 
 /* ---------------------------------------------------------- list */
 
-function markSelection() {
+function markSelection({ markRead = false } = {}) {
     let index = -1;
     rows().forEach((row, position) => {
         const selected = row.dataset.message === currentId;
         row.classList.toggle('is-selected', selected);
         row.setAttribute('aria-current', selected ? 'true' : 'false');
         if (selected) {
-            row.classList.remove('is-unread');
+            if (markRead) {
+                row.classList.remove('is-unread');
+            }
             index = position;
         }
     });
     if (index >= 0) {
         cursor = index;
+    }
+}
+
+function rowById(id) {
+    return id ? rows().find((row) => row.dataset.message === id) || null : null;
+}
+
+function captureCursor() {
+    const focused = document.activeElement;
+
+    return {
+        cursorId: cursor >= 0 ? rows()[cursor]?.dataset.message || null : null,
+        focusId: focused instanceof HTMLElement ? focused.dataset.message || null : null,
+    };
+}
+
+function restoreCursor({ cursorId, focusId }) {
+    const all = rows();
+    const target = rowById(cursorId);
+
+    if (target) {
+        cursor = all.indexOf(target);
+    } else if (cursor >= all.length) {
+        cursor = all.length - 1;
+    }
+
+    all.forEach((row, index) => row.classList.toggle('is-cursor', index === cursor && cursor >= 0));
+
+    const focusTarget = rowById(focusId);
+    if (focusTarget && document.activeElement !== focusTarget) {
+        focusTarget.focus({ preventScroll: true });
     }
 }
 
@@ -178,31 +219,39 @@ function syncFilterLinks(query) {
     });
 }
 
+/** @returns {Promise<number>} how many rows in the refreshed list were not there before */
 async function refreshList() {
     if (!list) {
-        return;
+        return 0;
     }
     const before = new Set(rows().map((row) => row.dataset.message));
+    const keyboard = captureCursor();
+    let arrived = 0;
     setBusy(1);
     try {
         const response = await request(partial(base || location.pathname, location.search, 'list'));
         if (!response.ok) {
-            return;
+            return 0;
         }
         list.innerHTML = await response.text();
-        if (!reduceMotion.matches) {
-            rows().forEach((row) => {
-                if (!before.has(row.dataset.message)) {
-                    row.classList.add('mb-row-new');
-                }
-            });
-        }
+        rows().forEach((row) => {
+            if (before.has(row.dataset.message)) {
+                return;
+            }
+            arrived += 1;
+            if (!reduceMotion.matches) {
+                row.classList.add('mb-row-new');
+            }
+        });
         markSelection();
+        restoreCursor(keyboard);
     } catch (error) {
         /* offline or navigating away — the next poll retries */
     } finally {
         setBusy(-1);
     }
+
+    return arrived;
 }
 
 /* ---------------------------------------------------------- detail */
@@ -233,11 +282,8 @@ function swapDetail(html, focusHeading) {
 function emptyDetail() {
     currentId = null;
     setPane('list');
-    swapDetail(
-        emptyDetailHtml ||
-            '<section class="mb-empty"><h2>Nothing selected</h2><p>Choose a message from the list to inspect it.</p></section>',
-        false
-    );
+    markSelection();
+    swapDetail(emptyDetailHtml || FALLBACK_EMPTY, false);
 }
 
 async function openMessage(href, { push = true, focus = true } = {}) {
@@ -271,7 +317,7 @@ async function openMessage(href, { push = true, focus = true } = {}) {
         }
         setPane('detail');
         swapDetail(html, focus);
-        markSelection();
+        markSelection({ markRead: true });
         pollSoon();
     } catch (error) {
         location.assign(href);
@@ -410,12 +456,11 @@ async function pollTick() {
             setUnread(Number(status.unread) || 0);
 
             if (next !== seq) {
-                const added = Math.max(0, next - seq);
                 seq = next;
                 body.dataset.mailboxSeq = String(seq);
-                await refreshList();
-                if (added > 0) {
-                    flash(added + ' new message' + (added === 1 ? '' : 's'));
+                const arrived = await refreshList();
+                if (arrived > 0) {
+                    flash(arrived + ' new message' + (arrived === 1 ? '' : 's'));
                 }
             }
         }
