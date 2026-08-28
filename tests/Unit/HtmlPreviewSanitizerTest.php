@@ -37,6 +37,17 @@ it('keeps safe formatting, inline styles and style blocks verbatim', function ()
         ->and($this->result->removed['style_blocks_kept'])->toBeGreaterThanOrEqual(1);
 });
 
+it('escapes uppercase style terminators without emitting scripts', function () {
+    $result = $this->sanitizer->sanitize(
+        '<style>.x::after { content: "</STYLE><script>alert(1)</script>"; }</style><p>Visible</p>',
+        [],
+        'http://x/parts',
+    );
+
+    expect(strtolower($result->document))->not->toContain('<script')
+        ->and($result->document)->toContain('<p>Visible</p>');
+});
+
 it('re-injects only validated cid part urls and data images', function () {
     $doc = $this->result->document;
 
@@ -57,6 +68,18 @@ it('neutralises links but reports them, with openable only for http(s)/mailto', 
             expect($link['openable'])->toBeFalse();
         }
     }
+});
+
+it('records and classifies links from the same normalised url', function () {
+    $result = $this->sanitizer->sanitize(
+        '<a href="h&#10;ttps://example.test/path">normalised</a>',
+        [],
+        'http://x/parts',
+    );
+
+    expect($result->links)->toHaveCount(1)
+        ->and($result->links[0]['url'])->toBe('https://example.test/path')
+        ->and($result->links[0]['openable'])->toBeTrue();
 });
 
 it('reports remote images and tracking pixels', function () {
@@ -88,4 +111,17 @@ it('drops unknown cid references and non-image data uris', function () {
     );
 
     expect($r->document)->not->toContain('src=')->not->toContain('data-mailbox');
+});
+
+it('enforces the data image base64 length bound', function () {
+    $kept = 'data:image/png;base64,'.str_repeat('A', 700000);
+    $dropped = 'data:image/png;base64,'.str_repeat('A', 700001);
+    $result = $this->sanitizer->sanitize(
+        '<img alt="kept" src="'.$kept.'"><img alt="dropped" src="'.$dropped.'">',
+        [],
+        'http://x/parts',
+    );
+
+    expect($result->document)->toContain('src="'.$kept.'"')
+        ->and(substr_count($result->document, 'src="data:image/png;base64,'))->toBe(1);
 });

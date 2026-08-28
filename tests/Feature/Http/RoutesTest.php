@@ -23,7 +23,12 @@ it('returns fragments for partial requests', function () {
     $id = mailboxCapture('Fragment');
 
     $this->get('/_mailbox?partial=list')->assertOk()->assertSee('Fragment')->assertDontSee('<html', false);
-    $this->get('/_mailbox/messages/'.$id.'?partial=detail')->assertOk()->assertSee('Fragment')->assertDontSee('<html', false);
+    $this->get('/_mailbox/messages/'.$id.'?partial=detail')
+        ->assertOk()
+        ->assertSee('Fragment')
+        ->assertSee('Mark unread')
+        ->assertDontSee('Mark read')
+        ->assertDontSee('<html', false);
     $this->get('/_mailbox/messages/'.$id)->assertOk()->assertSee('<html', false);
     expect(app(MessageStore::class)->find($id)->isRead())->toBeTrue();
 });

@@ -14,9 +14,16 @@ it('serves a sandboxed, csp-protected html preview with cid images resolved to p
     $response = $this->get('/_mailbox/messages/'.$id.'/preview/html');
 
     $response->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff')->assertHeader('Referrer-Policy', 'no-referrer');
+    expect($response->headers->get('Cache-Control'))->toContain('no-store');
     $csp = $response->headers->get('Content-Security-Policy');
-    expect($csp)->toContain("default-src 'none'")->toContain("img-src 'self' data:")->toContain('sandbox')->toContain("frame-ancestors 'self'");
-    expect($response->getContent())->toContain('/_mailbox/messages/'.$id.'/parts/')->not->toContain('href=');
+    $partsPrefix = rtrim((string) config('app.url'), '/').'/_mailbox/messages/'.$id.'/parts/';
+    expect($csp)
+        ->toContain("default-src 'none'")
+        ->toContain('img-src data: '.$partsPrefix)
+        ->not->toContain("img-src 'self'")
+        ->toContain('sandbox')
+        ->toContain("frame-ancestors 'self'");
+    expect($response->getContent())->toContain('src="'.$partsPrefix)->not->toContain('href=');
 });
 
 it('neuters hostile mail and lists its links and diagnostics in the workbench', function () {
@@ -32,7 +39,9 @@ it('neuters hostile mail and lists its links and diagnostics in the workbench', 
 
     $detail = $this->get('/_mailbox/messages/'.$id.'?partial=detail');
     $detail->assertOk()->assertSee('reset-password?token=SECRET123')->assertSee('html.scripts_removed')->assertDontSee('<script>alert', false);
-    $this->get('/_mailbox/messages/'.$id.'/preview/text')->assertOk()->assertHeader('Content-Security-Policy');
+    $text = $this->get('/_mailbox/messages/'.$id.'/preview/text');
+    $text->assertOk()->assertHeader('Content-Security-Policy');
+    expect($text->headers->get('Cache-Control'))->toContain('no-store');
 });
 
 it('escapes hostile subjects in the workbench dom', function () {

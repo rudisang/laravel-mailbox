@@ -12,7 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 final class PreviewController
 {
     /** @var non-empty-string */
-    private const CONTENT_SECURITY_POLICY = "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'none'; connect-src 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; frame-ancestors 'self'; sandbox";
+    private const PART_PLACEHOLDER = 'MAILBOXPARTPLACEHOLDER';
 
     public function __construct(
         private readonly MessageStore $store,
@@ -42,10 +42,10 @@ final class PreviewController
             }
         }
 
-        $base = rtrim(route('mailbox.message', ['id' => $record->id]), '/').'/parts';
-        $preview = $this->sanitizer->sanitize($html, $cidMap, $base);
+        $partsPrefix = $this->partsPrefix($record->id);
+        $preview = $this->sanitizer->sanitize($html, $cidMap, rtrim($partsPrefix, '/'));
 
-        return response($preview->document, 200, $this->headers());
+        return response($preview->document, 200, $this->headers($partsPrefix));
     }
 
     public function text(string $id): Response
@@ -61,18 +61,25 @@ final class PreviewController
         $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
         $document = '<!doctype html><html><head><meta charset="utf-8"><style>body{margin:16px;font:14px/1.5 ui-monospace,monospace;white-space:pre-wrap;word-break:break-word}</style></head><body><pre>'.$escaped.'</pre></body></html>';
 
-        return response($document, 200, $this->headers());
+        return response($document, 200, $this->headers($this->partsPrefix($record->id)));
     }
 
     /** @return array<string, string> */
-    private function headers(): array
+    private function headers(string $partsPrefix): array
     {
         return [
             'Content-Type' => 'text/html; charset=UTF-8',
-            'Content-Security-Policy' => self::CONTENT_SECURITY_POLICY,
+            'Content-Security-Policy' => "default-src 'none'; img-src data: {$partsPrefix}; style-src 'unsafe-inline'; font-src 'none'; connect-src 'none'; form-action 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; frame-ancestors 'self'; sandbox",
             'Referrer-Policy' => 'no-referrer',
             'X-Content-Type-Options' => 'nosniff',
             'Cache-Control' => 'no-store',
         ];
+    }
+
+    private function partsPrefix(string $id): string
+    {
+        $partUrl = route('mailbox.part', ['id' => $id, 'part' => self::PART_PLACEHOLDER]);
+
+        return str_replace(self::PART_PLACEHOLDER, '', $partUrl);
     }
 }

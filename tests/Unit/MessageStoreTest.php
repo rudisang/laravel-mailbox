@@ -59,13 +59,24 @@ afterEach(function () {
 });
 
 it('records the current schema version for a fresh store', function () {
-    expect($this->store->schemaVersion())->toBe(Schema::version());
+    $preserved = $this->paths->messagesDir().DIRECTORY_SEPARATOR.'fresh-state';
+    file_put_contents($preserved, 'keep');
+
+    expect($this->store->schemaVersion())->toBe(Schema::version())
+        ->and(file_get_contents($preserved))->toBe('keep');
 });
 
-it('rebuilds stale schema tables and message directories', function () {
+it('rebuilds legacy or outdated schema tables and message directories', function (?string $storedVersion) {
     $pdo = $this->store->pdo();
     $pdo->exec('ALTER TABLE messages ADD COLUMN stale_column TEXT NULL');
-    $pdo->exec("UPDATE mailbox_meta SET value = '0' WHERE key = 'schema_version'");
+
+    if ($storedVersion === null) {
+        $pdo->exec("DELETE FROM mailbox_meta WHERE key = 'schema_version'");
+    } else {
+        $statement = $pdo->prepare("UPDATE mailbox_meta SET value = :version WHERE key = 'schema_version'");
+        $statement->execute(['version' => $storedVersion]);
+    }
+
     $stale = $this->paths->messagesDir().DIRECTORY_SEPARATOR.'stale-message';
     mkdir($stale, 0700, true);
     file_put_contents($stale.DIRECTORY_SEPARATOR.'raw.eml', 'stale');
@@ -75,6 +86,21 @@ it('rebuilds stale schema tables and message directories', function () {
 
     expect(array_column($columns, 'name'))->not->toContain('stale_column')
         ->and(is_dir($stale))->toBeFalse()
+        ->and($rebuilt->schemaVersion())->toBe(Schema::version());
+})->with([
+    'legacy store without a meta row' => null,
+    'store with an older version' => '0',
+]);
+
+it('rebuilds a schema with a non-integer stored version', function () {
+    $pdo = $this->store->pdo();
+    $pdo->exec('ALTER TABLE messages ADD COLUMN stale_column TEXT NULL');
+    $pdo->exec("UPDATE mailbox_meta SET value = 'abc' WHERE key = 'schema_version'");
+
+    $rebuilt = new MessageStore($this->paths, new MaintenanceLock($this->paths->lock()));
+    $columns = $rebuilt->pdo()->query('PRAGMA table_info(messages)')?->fetchAll() ?: [];
+
+    expect(array_column($columns, 'name'))->not->toContain('stale_column')
         ->and($rebuilt->schemaVersion())->toBe(Schema::version());
 });
 

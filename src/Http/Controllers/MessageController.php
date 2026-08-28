@@ -25,13 +25,13 @@ final class MessageController
 
     public function show(Request $request, string $id): View|Response
     {
+        $this->store->markRead($id, true);
         $detail = $this->presenter->detail($id);
 
         if ($detail === null) {
             return response()->view('mailbox::errors.404', [], 404);
         }
 
-        $this->store->markRead($id, true);
         $raw = $this->rawPreview($id);
 
         if ($request->query('partial') === 'detail') {

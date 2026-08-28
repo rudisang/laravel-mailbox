@@ -80,15 +80,6 @@ final class ContextCollector
         ];
     }
 
-    public function jobFinished(): void
-    {
-        $id = array_key_last($this->jobs);
-
-        if ($id !== null) {
-            unset($this->jobs[$id]);
-        }
-    }
-
     public function jobFinishedFor(JobContract $job): void
     {
         unset($this->jobs[spl_object_id($job)]);

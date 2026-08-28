@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Mime;
 
+use DOMDocument;
+use DOMNode;
+use DOMXPath;
 use Illuminate\Support\Str;
 use Rudisang\Mailbox\Support\Limits;
 use Symfony\Component\Mailer\Header\MetadataHeader;
@@ -322,12 +325,34 @@ class StructuredMessageExtractor
         $contents = mb_convert_encoding($contents, 'UTF-8', 'UTF-8');
 
         if ($textId === null) {
-            $contents = html_entity_decode(strip_tags($contents), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $contents = $this->htmlBodyText($contents);
         }
 
         $collapsed = preg_replace('/\s+/u', ' ', $contents);
 
         return trim($collapsed ?? $contents);
+    }
+
+    private function htmlBodyText(string $html): string
+    {
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $previous = libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8">'.$html, LIBXML_NONET | LIBXML_NOWARNING | LIBXML_NOERROR | LIBXML_BIGLINES);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+        $xpath = new DOMXPath($dom);
+
+        foreach (iterator_to_array($xpath->query('//style | //script | //noscript | //template') ?: []) as $element) {
+            if (! $element instanceof DOMNode) {
+                continue;
+            }
+
+            $element->parentNode?->removeChild($element);
+        }
+
+        $body = $dom->getElementsByTagName('body')->item(0);
+
+        return $body === null ? '' : $body->textContent;
     }
 
     /**

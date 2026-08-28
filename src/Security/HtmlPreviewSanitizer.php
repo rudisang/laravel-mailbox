@@ -132,8 +132,8 @@ final class HtmlPreviewSanitizer
                 }
 
                 $decoded = html_entity_decode($value, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                $compact = preg_replace('/[\x00-\x20]+/', '', $decoded) ?? '';
-                $scheme = strtolower((string) parse_url($compact, PHP_URL_SCHEME));
+                $normalised = preg_replace('/[\x00-\x20\x7f]+/', '', $decoded) ?? '';
+                $scheme = strtolower((string) parse_url($normalised, PHP_URL_SCHEME));
 
                 if ($scheme === 'javascript' || $scheme === 'vbscript') {
                     $removed['javascript_urls']++;
@@ -142,9 +142,8 @@ final class HtmlPreviewSanitizer
                 if ($name === 'href' && strtolower($element->tagName) === 'a') {
                     $links[] = [
                         'text' => trim(preg_replace('/\s+/', ' ', $element->textContent) ?? ''),
-                        'url' => $decoded,
-                        'openable' => in_array($scheme, ['http', 'https', 'mailto'], true)
-                            && preg_match('/[\x00-\x1f\x7f]/', $decoded) !== 1,
+                        'url' => $normalised,
+                        'openable' => in_array($scheme, ['http', 'https', 'mailto'], true),
                     ];
                 }
 
@@ -252,7 +251,7 @@ final class HtmlPreviewSanitizer
             }
         }
 
-        $css = str_replace('</style', '<\/style', implode("\n", $styles));
+        $css = str_ireplace('</style', '<\/style', implode("\n", $styles));
         $document = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>'.$css.'</style></head><body>'.$final.'</body></html>';
 
         return new PreviewResult(

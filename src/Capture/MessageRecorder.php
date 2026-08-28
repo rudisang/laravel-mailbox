@@ -48,7 +48,7 @@ final class MessageRecorder
         try {
             $this->paths->ensureRoot();
 
-            if (! @mkdir($tmp.DIRECTORY_SEPARATOR.'parts', 0755, true) && ! is_dir($tmp.DIRECTORY_SEPARATOR.'parts')) {
+            if (! @mkdir($tmp.DIRECTORY_SEPARATOR.'parts', 0700, true) && ! is_dir($tmp.DIRECTORY_SEPARATOR.'parts')) {
                 throw new RuntimeException('Unable to create the capture staging directory.');
             }
 

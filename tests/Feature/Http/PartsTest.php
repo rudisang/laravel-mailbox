@@ -16,9 +16,13 @@ it('downloads attachments as octet-stream with safe dispositions', function () {
 
     $response = $this->get('/_mailbox/messages/'.$id.'/parts/'.$pdf->id);
 
-    $response->assertOk()->assertHeader('Content-Type', 'application/octet-stream')->assertHeader('X-Content-Type-Options', 'nosniff');
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'application/octet-stream')
+        ->assertHeader('X-Content-Type-Options', 'nosniff')
+        ->assertHeader('Content-Security-Policy', "default-src 'none'; sandbox");
     expect($response->headers->get('Content-Disposition'))->toBe('attachment; filename=invoice-9.pdf')
-        ->and($response->headers->get('Content-Length'))->toBe((string) $pdf->decodedBytes);
+        ->and($response->headers->get('Content-Length'))->toBe((string) $pdf->decodedBytes)
+        ->and($response->headers->get('Cache-Control'))->toContain('private')->toContain('max-age=3600');
 });
 
 it('never inlines svg, html or mislabelled images and strips header injection from filenames', function () {

@@ -44,6 +44,22 @@ it('extracts multipart/alternative with ordered children', function () {
         ->and($m->textPartId)->toBe($m->parts[1]->id);
 });
 
+it('excludes non-visible html elements from preview and search text', function () {
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->html('<style>.x{color:red}</style><script>alert(1)</script><noscript>fallback</noscript><template>hidden</template><p>Visible words</p>');
+
+    $message = $this->extractor->extract($email, $this->dir);
+
+    expect($message->previewText)->toBe('Visible words')
+        ->and($message->searchText)->toContain('visible words')
+        ->not->toContain('alert')
+        ->not->toContain('color:red')
+        ->not->toContain('fallback')
+        ->not->toContain('hidden');
+});
+
 it('extracts mixed attachments with filenames, dispositions and decoded blobs', function () {
     $m = $this->extractor->extract(Emails::mixedWithAttachments(), $this->dir);
     $attachments = array_values(array_filter($m->parts, fn ($p) => $p->isAttachment));

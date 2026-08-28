@@ -39,11 +39,10 @@ final class MessageStore
         $pdo->exec('PRAGMA foreign_keys = ON');
 
         $initialised = $this->lock->exclusive(function () use ($pdo): bool {
-            foreach (Schema::statements() as $sql) {
-                $pdo->exec($sql);
-            }
+            $hasSchema = $this->hasMailboxSchema($pdo);
+            $storedVersion = $this->readSchemaVersion($pdo);
 
-            if ($this->readSchemaVersion($pdo) !== Schema::version()) {
+            if ($hasSchema && $storedVersion !== Schema::version()) {
                 // This development-only store uses destructive schema upgrades instead of migrations.
                 foreach (Schema::dropStatements() as $sql) {
                     $pdo->exec($sql);
@@ -51,13 +50,10 @@ final class MessageStore
 
                 $this->removeDirectories($this->paths->messagesDir());
                 $this->removeDirectories($this->paths->tmpDir());
+            }
 
-                foreach (Schema::statements() as $sql) {
-                    $pdo->exec($sql);
-                }
-
-                $statement = $pdo->prepare("INSERT OR REPLACE INTO mailbox_meta (key, value) VALUES ('schema_version', :version)");
-                $statement->execute(['version' => (string) Schema::version()]);
+            foreach (Schema::statements() as $sql) {
+                $pdo->exec($sql);
             }
 
             return true;
@@ -72,7 +68,13 @@ final class MessageStore
 
     public function schemaVersion(): int
     {
-        return $this->readSchemaVersion($this->pdo());
+        $version = $this->readSchemaVersion($this->pdo());
+
+        if ($version === null) {
+            throw new RuntimeException('Mailbox schema version could not be read.');
+        }
+
+        return $version;
     }
 
     /**
@@ -395,17 +397,28 @@ final class MessageStore
         return [$clauses === [] ? '' : ' WHERE '.implode(' AND ', $clauses), $parameters];
     }
 
-    private function readSchemaVersion(PDO $pdo): int
+    private function readSchemaVersion(PDO $pdo): ?int
     {
-        $statement = $pdo->prepare("SELECT value FROM mailbox_meta WHERE key = 'schema_version' LIMIT 1");
-        $statement->execute();
-        $value = $statement->fetchColumn();
+        try {
+            $statement = $pdo->prepare("SELECT value FROM mailbox_meta WHERE key = 'schema_version' LIMIT 1");
+            $statement->execute();
+            $value = $statement->fetchColumn();
+        } catch (PDOException) {
+            return null;
+        }
 
         if (! is_string($value) || filter_var($value, FILTER_VALIDATE_INT) === false) {
-            throw new RuntimeException('Mailbox schema version could not be read.');
+            return null;
         }
 
         return (int) $value;
+    }
+
+    private function hasMailboxSchema(PDO $pdo): bool
+    {
+        $statement = $pdo->query("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name IN ('mailbox_meta', 'messages', 'parts') LIMIT 1");
+
+        return $statement !== false && $statement->fetchColumn() !== false;
     }
 
     private function removeDirectories(string $directory): void
