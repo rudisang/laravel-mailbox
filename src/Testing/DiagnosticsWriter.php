@@ -7,6 +7,7 @@ namespace Rudisang\Mailbox\Testing;
 use RuntimeException;
 use XMLWriter;
 
+/** @internal */
 final class DiagnosticsWriter
 {
     /** @param array<string, mixed> $report */
@@ -38,34 +39,41 @@ final class DiagnosticsWriter
         $writer->setIndent(true);
         $writer->setIndentString('  ');
         $writer->startDocument('1.0', 'UTF-8');
+        $writer->startElement('testsuites');
+        $writer->writeAttribute('tests', self::xmlValue((string) $tests));
+        $writer->writeAttribute('failures', self::xmlValue((string) $failures));
+        $writer->writeAttribute('errors', self::xmlValue('0'));
         $writer->startElement('testsuite');
-        $writer->writeAttribute('name', sprintf('mailbox:%s', $captureId));
-        $writer->writeAttribute('tests', (string) $tests);
-        $writer->writeAttribute('failures', (string) $failures);
-        $writer->writeAttribute('errors', '0');
+        $writer->writeAttribute('name', self::xmlValue(sprintf('mailbox:%s', $captureId)));
+        $writer->writeAttribute('tests', self::xmlValue((string) $tests));
+        $writer->writeAttribute('failures', self::xmlValue((string) $failures));
+        $writer->writeAttribute('errors', self::xmlValue('0'));
 
         if ($results === []) {
             $writer->startElement('testcase');
-            $writer->writeAttribute('name', 'no-findings');
+            $writer->writeAttribute('name', self::xmlValue('no-findings'));
+            $writer->writeAttribute('classname', self::xmlValue('mailbox'));
             $writer->endElement();
         } else {
             foreach ($results as $result) {
                 $writer->startElement('testcase');
-                $writer->writeAttribute('name', $result['rule']);
+                $writer->writeAttribute('name', self::xmlValue($result['rule']));
+                $writer->writeAttribute('classname', self::xmlValue('mailbox'));
 
                 if ($result['severity'] === 'error') {
                     $writer->startElement('failure');
-                    $writer->writeAttribute('message', $result['message']);
-                    $writer->text(self::json($result));
+                    $writer->writeAttribute('message', self::xmlValue($result['message']));
+                    $writer->text(self::xmlValue(self::json($result)));
                     $writer->endElement();
                 } else {
-                    $writer->writeElement('system-out', self::json($result));
+                    $writer->writeElement('system-out', self::xmlValue(self::json($result)));
                 }
 
                 $writer->endElement();
             }
         }
 
+        $writer->endElement();
         $writer->endElement();
         $writer->endDocument();
 
@@ -105,5 +113,10 @@ final class DiagnosticsWriter
         }
 
         return $normalised;
+    }
+
+    private static function xmlValue(string $value): string
+    {
+        return preg_replace('/[\x{FDD0}-\x{FDEF}\x{FFFE}\x{FFFF}]/u', '', $value) ?? '';
     }
 }

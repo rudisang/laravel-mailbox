@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Testing;
 
 use Rudisang\Mailbox\Storage\PartRecord;
 
+/** @internal */
 final class Snapshots
 {
     public static function html(CapturedMessage $message): string

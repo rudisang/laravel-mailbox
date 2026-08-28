@@ -140,26 +140,31 @@ final class CapturedMessage
         return $contents === false ? '' : $contents;
     }
 
+    /** Returns an HTML snapshot where every cid: occurrence, including visible text, is rewritten to a stable part token. */
     public function htmlSnapshot(): string
     {
         return Snapshots::html($this);
     }
 
+    /** Returns the plain-text body verbatim for snapshot comparison. */
     public function textSnapshot(): string
     {
         return Snapshots::text($this);
     }
 
+    /** Returns normalized headers; multipart boundaries are not normalized, so multipart mail is not golden-file stable. */
     public function headersSnapshot(): string
     {
         return Snapshots::headers($this);
     }
 
+    /** Returns a stable, indented summary of the captured MIME tree. */
     public function mimeTreeSnapshot(): string
     {
         return Snapshots::mimeTree($this);
     }
 
+    /** Asserts that the HTML snapshot exactly matches the expected HTML. */
     public function assertMatchesSnapshot(string $expectedHtml): static
     {
         Assert::assertSame(
@@ -171,11 +176,31 @@ final class CapturedMessage
         return $this;
     }
 
+    /** Copies the non-empty raw message blob to the requested path. */
     public function saveEml(string $path): string
     {
-        return self::write($path, $this->raw());
+        $rawPath = $this->paths->raw($this->id());
+
+        if (! is_file($rawPath) || ! is_readable($rawPath)) {
+            throw new RuntimeException(sprintf(
+                'Unable to export raw message for capture [%s]: the raw blob is missing or unreadable.',
+                $this->id(),
+            ));
+        }
+
+        $contents = @file_get_contents($rawPath);
+
+        if ($contents === false || $contents === '') {
+            throw new RuntimeException(sprintf(
+                'Unable to export raw message for capture [%s]: the raw blob is unreadable or empty.',
+                $this->id(),
+            ));
+        }
+
+        return self::write($path, $contents);
     }
 
+    /** Saves diagnostics as json or junit; throws InvalidArgumentException for any other format. */
     public function saveDiagnostics(string $path, string $format = 'json'): string
     {
         $contents = match ($format) {
@@ -187,6 +212,7 @@ final class CapturedMessage
         return self::write($path, $contents);
     }
 
+    /** Saves a redacted JSON fixture containing only portable captured-message fields. */
     public function saveFixture(string $path): string
     {
         return self::write($path, DiagnosticsWriter::json(Snapshots::fixture($this)));
@@ -671,7 +697,15 @@ final class CapturedMessage
 
     private static function write(string $path, string $contents): string
     {
-        if (file_put_contents($path, $contents) === false) {
+        $directory = dirname($path);
+
+        if (! is_dir($directory) && ! @mkdir($directory, 0700, true) && ! is_dir($directory)) {
+            throw new RuntimeException(sprintf('Unable to write mailbox artifact [%s].', $path));
+        }
+
+        $written = @file_put_contents($path, $contents);
+
+        if ($written === false || $written !== strlen($contents)) {
             throw new RuntimeException(sprintf('Unable to write mailbox artifact [%s].', $path));
         }
 
