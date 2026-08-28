@@ -19,10 +19,14 @@ use Illuminate\Support\ServiceProvider;
 use Rudisang\Mailbox\Capture\ContextCollector;
 use Rudisang\Mailbox\Capture\FailureInjector;
 use Rudisang\Mailbox\Capture\MessageRecorder;
+use Rudisang\Mailbox\Console\ClearCommand;
+use Rudisang\Mailbox\Console\DoctorCommand;
+use Rudisang\Mailbox\Console\PruneCommand;
 use Rudisang\Mailbox\Mime\StructuredMessageExtractor;
 use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Storage\Pruner;
+use Rudisang\Mailbox\Storage\Repair;
 use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Rudisang\Mailbox\Support\Limits;
 use Rudisang\Mailbox\Support\StoragePaths;
@@ -51,6 +55,11 @@ class MailboxServiceProvider extends ServiceProvider
         $this->app->singleton(StoragePaths::class, fn (Application $app) => StoragePaths::fromConfig($app->make('config'), $app));
         $this->app->singleton(MaintenanceLock::class, fn (Application $app) => new MaintenanceLock($app->make(StoragePaths::class)->lock()));
         $this->app->singleton(MessageStore::class, fn (Application $app) => new MessageStore($app->make(StoragePaths::class), $app->make(MaintenanceLock::class)));
+        $this->app->singleton(Repair::class, fn (Application $app) => new Repair(
+            $app->make(StoragePaths::class),
+            $app->make(MessageStore::class),
+            $app->make(MaintenanceLock::class),
+        ));
         $this->app->singleton(FailureInjector::class);
         $this->app->singleton(ContextCollector::class, fn (Application $app) => new ContextCollector($app, $app->make('config')));
         $this->app->singleton(Pruner::class, fn (Application $app) => new Pruner(
@@ -116,6 +125,8 @@ class MailboxServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
+            $this->commands([DoctorCommand::class, ClearCommand::class, PruneCommand::class]);
+
             $this->publishes([
                 __DIR__.'/../config/mailbox.php' => $this->app->configPath('mailbox.php'),
             ], ['mailbox', 'mailbox-config']);
