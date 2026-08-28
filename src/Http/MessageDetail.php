@@ -7,6 +7,7 @@ namespace Rudisang\Mailbox\Http;
 use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\PartRecord;
 
+/** @internal */
 final readonly class MessageDetail
 {
     /**

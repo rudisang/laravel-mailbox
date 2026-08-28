@@ -18,6 +18,7 @@ use Rudisang\Mailbox\Storage\PartRecord;
 use Rudisang\Mailbox\Support\StoragePaths;
 use RuntimeException;
 
+/** Public assertion and fact API for one captured message. */
 final class CapturedMessage
 {
     private readonly MessagePresenter $presenter;
@@ -316,6 +317,7 @@ final class CapturedMessage
         return $preview === null ? [] : $preview->links;
     }
 
+    /** @internal */
     public function record(): MessageRecord
     {
         return $this->record;

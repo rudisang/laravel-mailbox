@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Support;
 
+/** @internal */
 final class Limits
 {
     public function __construct(

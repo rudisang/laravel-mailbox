@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Rudisang\Mailbox\Capture\MessageRecorder;
 use Rudisang\Mailbox\Support\EnvironmentGuard;
 
+/** @internal */
 final class LocalTransportFactory
 {
     public function __construct(private readonly Application $app) {}

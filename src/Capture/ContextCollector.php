@@ -12,6 +12,7 @@ use Rudisang\Mailbox\Mime\AddressNormalizer;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mime\RawMessage;
 
+/** @internal */
 final class ContextCollector
 {
     /**

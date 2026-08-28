@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Storage;
 
+/** @internal */
 final class Schema
 {
     /** @return list<string> */

@@ -7,6 +7,7 @@ namespace Rudisang\Mailbox\Http\Controllers;
 use Rudisang\Mailbox\Support\Assets;
 use Symfony\Component\HttpFoundation\Response;
 
+/** @internal */
 final class AssetController
 {
     public function show(string $file): Response

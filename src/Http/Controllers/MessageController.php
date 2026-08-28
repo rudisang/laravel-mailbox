@@ -16,6 +16,7 @@ use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Symfony\Component\HttpFoundation\Response;
 
+/** @internal */
 final class MessageController
 {
     public function __construct(
@@ -127,9 +128,15 @@ final class MessageController
         // Schema initialization takes the same lock, so complete it before maintenance.
         $this->store->pdo();
 
-        $this->lock->exclusive(function () use ($id): void {
+        $deleted = $this->lock->exclusive(function () use ($id): bool {
             $this->store->delete($id);
+
+            return true;
         }, true);
+
+        if ($deleted !== true) {
+            abort(503, 'Mailbox maintenance could not acquire the exclusive lock.');
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['deleted' => true]);

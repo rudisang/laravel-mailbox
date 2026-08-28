@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Support;
 
 use RuntimeException;
 
+/** @internal */
 final class Assets
 {
     public static function path(string $file): string

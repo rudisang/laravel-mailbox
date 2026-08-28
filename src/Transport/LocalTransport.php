@@ -9,6 +9,7 @@ use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mailer\Transport\AbstractTransport;
 
+/** @internal */
 final class LocalTransport extends AbstractTransport
 {
     public function __construct(

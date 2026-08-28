@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Storage;
 
+/** Stable value object returned by CapturedMessage::parts()/attachments(). */
 final readonly class PartRecord
 {
     public function __construct(

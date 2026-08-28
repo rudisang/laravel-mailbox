@@ -25,6 +25,7 @@ use Symfony\Component\Mailer\SentMessage;
 use Symfony\Component\Mime\Email;
 use Throwable;
 
+/** @internal */
 final class MessageRecorder
 {
     public function __construct(

@@ -34,18 +34,35 @@ it('extracts a plain message as a single text part', function () {
         ->and($m->parts[0]->depth)->toBe(0);
 });
 
-it('converts a declared legacy text charset for preview and search facts', function () {
+it('converts declared text charset aliases for preview and search facts', function (string $bytes, string $charset, string $expected) {
     $email = (new Email)
         ->from('sender@example.com')
         ->to('recipient@example.com')
         ->subject('Legacy charset')
-        ->setBody(new TextPart("caf\xe9", 'iso-8859-1', 'plain', '8bit'));
+        ->setBody(new TextPart($bytes, $charset, 'plain', '8bit'));
 
     $message = $this->extractor->extract($email, $this->dir);
 
-    expect($message->previewText)->toBe('café')
-        ->and($message->searchText)->toContain('café')
-        ->and(file_get_contents($message->parts[0]->blobPath))->toBe("caf\xe9");
+    expect($message->previewText)->toBe($expected)
+        ->and($message->searchText)->toContain(mb_strtolower($expected, 'UTF-8'))
+        ->and(file_get_contents($message->parts[0]->blobPath))->toBe($bytes);
+})->with([
+    'ISO-8859-1 canonical name' => ["caf\xe9", 'iso-8859-1', 'café'],
+    'latin1 alias' => ["caf\xe9", 'latin1', 'café'],
+    'Shift_JIS' => ["\x83e\x83X\x83g", 'Shift_JIS', 'テスト'],
+]);
+
+it('falls back to UTF-8 substitution for an unknown charset without warnings', function () {
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Unknown charset')
+        ->setBody(new TextPart("\xfftext", 'x-nope', 'plain', '8bit'));
+
+    $message = $this->extractor->extract($email, $this->dir);
+
+    expect($message->previewText)->toBe('?text')
+        ->and($message->searchText)->toContain('?text');
 });
 
 it('extracts multipart/alternative with ordered children', function () {

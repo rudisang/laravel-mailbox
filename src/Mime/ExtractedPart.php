@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Mime;
 
+/** @internal */
 final readonly class ExtractedPart
 {
     public function __construct(

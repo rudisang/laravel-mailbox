@@ -7,7 +7,9 @@ namespace Rudisang\Mailbox\Console;
 use Illuminate\Console\Command;
 use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
+use RuntimeException;
 
+/** @internal */
 final class ClearCommand extends Command
 {
     /** @var string */
@@ -34,9 +36,15 @@ final class ClearCommand extends Command
         // Schema initialization takes the same lock, so complete it before maintenance.
         $this->store->pdo();
 
-        $this->lock->exclusive(function (): void {
+        $cleared = $this->lock->exclusive(function (): bool {
             $this->store->clear();
+
+            return true;
         }, true);
+
+        if ($cleared !== true) {
+            throw new RuntimeException('Mailbox maintenance could not acquire the exclusive lock.');
+        }
 
         $this->components->info('Mailbox cleared.');
 

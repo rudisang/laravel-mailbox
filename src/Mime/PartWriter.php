@@ -9,6 +9,7 @@ use Symfony\Component\Mime\Part\AbstractPart;
 use Symfony\Component\Mime\Part\MessagePart;
 use Throwable;
 
+/** @internal */
 final class PartWriter
 {
     /** @return array{bytes: int, sha256: string} */

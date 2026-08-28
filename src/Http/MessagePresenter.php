@@ -14,6 +14,7 @@ use Rudisang\Mailbox\Storage\PartRecord;
 use Rudisang\Mailbox\Support\Limits;
 use Rudisang\Mailbox\Support\StoragePaths;
 
+/** @internal */
 final class MessagePresenter
 {
     public function __construct(

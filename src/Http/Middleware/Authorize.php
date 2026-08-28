@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Gate;
 use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Symfony\Component\HttpFoundation\Response;
 
+/** @internal */
 final class Authorize
 {
     public function __construct(private readonly EnvironmentGuard $guard) {}

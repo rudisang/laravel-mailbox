@@ -8,6 +8,7 @@ use finfo;
 use Normalizer;
 use Symfony\Component\HttpFoundation\HeaderUtils;
 
+/** @internal */
 final class AttachmentPolicy
 {
     /** @var non-empty-list<non-empty-string> */

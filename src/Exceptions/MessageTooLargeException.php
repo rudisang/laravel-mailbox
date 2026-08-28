@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Exceptions;
 
 use Symfony\Component\Mailer\Exception\TransportException;
 
+/** Thrown by the mailbox transport when a raw message exceeds the configured limit. */
 final class MessageTooLargeException extends TransportException
 {
     public static function limit(int $limit): self

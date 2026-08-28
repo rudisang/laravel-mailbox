@@ -7,6 +7,7 @@ namespace Rudisang\Mailbox\Console;
 use Illuminate\Console\Command;
 use Rudisang\Mailbox\Storage\Pruner;
 
+/** @internal */
 final class PruneCommand extends Command
 {
     /** @var string */

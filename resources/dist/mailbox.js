@@ -445,7 +445,7 @@ function wake() {
 
 async function pollTick() {
     try {
-        const response = await request(base + '/api/status?since=' + seq, {
+        const response = await request(base + '/api/status', {
             headers: etag ? { 'If-None-Match': etag } : {},
         });
 

@@ -13,6 +13,7 @@ use Rudisang\Mailbox\Http\Routing;
 use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 
+/** @internal */
 final class InboxController
 {
     public function __construct(
@@ -48,9 +49,15 @@ final class InboxController
         // Schema initialization takes the same lock, so complete it before maintenance.
         $this->store->pdo();
 
-        $this->lock->exclusive(function (): void {
+        $cleared = $this->lock->exclusive(function (): bool {
             $this->store->clear();
+
+            return true;
         }, true);
+
+        if ($cleared !== true) {
+            abort(503, 'Mailbox maintenance could not acquire the exclusive lock.');
+        }
 
         if ($request->expectsJson()) {
             return response()->json(['cleared' => true]);

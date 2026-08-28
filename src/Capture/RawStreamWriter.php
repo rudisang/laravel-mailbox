@@ -8,6 +8,7 @@ use Rudisang\Mailbox\Exceptions\MessageTooLargeException;
 use RuntimeException;
 use Throwable;
 
+/** @internal */
 final class RawStreamWriter
 {
     /**

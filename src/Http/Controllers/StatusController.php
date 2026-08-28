@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Symfony\Component\HttpFoundation\Response;
 
+/** @internal */
 final class StatusController
 {
     public function __construct(private readonly MessageStore $store) {}

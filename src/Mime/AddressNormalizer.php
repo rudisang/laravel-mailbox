@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Mime;
 
 use Symfony\Component\Mime\Address;
 
+/** @internal */
 final class AddressNormalizer
 {
     /**

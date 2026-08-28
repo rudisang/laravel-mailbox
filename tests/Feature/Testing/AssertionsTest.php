@@ -58,18 +58,35 @@ it('exposes facts and inline images', function () {
         ->and($m->attachmentContent('missing.pdf'))->toBeNull();
 });
 
-it('presents captured legacy charset text as utf-8', function () {
+it('presents captured charset aliases as utf-8', function (string $bytes, string $charset, string $expected) {
     $email = (new Email)
         ->from('sender@example.com')
         ->to('recipient@example.com')
         ->subject('Legacy charset')
-        ->setBody(new TextPart("caf\xe9", 'iso-8859-1', 'plain', '8bit'));
+        ->setBody(new TextPart($bytes, $charset, 'plain', '8bit'));
 
     Mail::mailer('local')->getSymfonyTransport()->send($email);
     $message = mailbox()->latest();
 
-    expect($message->record()->previewText)->toBe('café')
-        ->and($message->text())->toBe('café');
+    expect($message->record()->previewText)->toBe($expected)
+        ->and($message->text())->toBe($expected);
+})->with([
+    'latin1 alias' => ["caf\xe9", 'latin1', 'café'],
+    'Shift_JIS' => ["\x83e\x83X\x83g", 'Shift_JIS', 'テスト'],
+]);
+
+it('falls back from a garbage captured charset without warnings', function () {
+    $email = (new Email)
+        ->from('sender@example.com')
+        ->to('recipient@example.com')
+        ->subject('Unknown charset')
+        ->setBody(new TextPart("\xfftext", 'x-nope', 'plain', '8bit'));
+
+    Mail::mailer('local')->getSymfonyTransport()->send($email);
+    $message = mailbox()->latest();
+
+    expect($message->record()->previewText)->toBe('?text')
+        ->and($message->text())->toBe('?text');
 });
 
 it('handles stale raw and attachment files without warnings', function () {

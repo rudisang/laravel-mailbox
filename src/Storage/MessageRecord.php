@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Storage;
 
+/** @internal */
 final readonly class MessageRecord
 {
     /**

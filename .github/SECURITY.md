@@ -30,6 +30,8 @@ Captured email is hostile input and may also contain secrets. Laravel Mailbox is
 - Capture and browsing do not proxy images, check links, or make other message-directed network requests. Ordinary logs must not contain message content or recipient data.
 - Raw messages, bodies, addresses, attachments, links, and tokens can all be sensitive. Storage must remain private, and captures should be removed with `mailbox:clear` or `mailbox:prune` when no longer needed.
 
+The storage directory (`storage/framework/mailbox` by default) is inside the trust boundary: a local user who can write there can tamper with captures, and symlinks are refused only on download routes. Exception messages and `mailbox:doctor` output may include local filesystem paths, but never message content.
+
 ## What is not covered
 
 CSS is contained, not sanitized. Author style blocks are retained inside the sandboxed preview and can make that preview visually misleading. The sandbox and CSP are intended to contain CSS to that opaque document and block its network activity; they do not promise safe or faithful visual rendering.

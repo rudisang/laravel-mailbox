@@ -11,6 +11,7 @@ use Rudisang\Mailbox\Support\Limits;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
+/** @internal */
 final class HtmlPreviewSanitizer
 {
     /** @var non-empty-list<non-empty-string> */

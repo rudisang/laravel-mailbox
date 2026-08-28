@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Rudisang\Mailbox\MailboxServiceProvider;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\Assets;
 
@@ -131,6 +132,25 @@ it('waits for active captures before clearing through the web route', function (
         ->and($errors)->toBe('')
         ->and($exitCode)->toBe(0)
         ->and($store->count())->toBe(0);
+});
+
+it('returns 503 when delete and clear maintenance callbacks do not run', function () {
+    $id = mailboxCapture('Unavailable maintenance lock');
+    $store = app(MessageStore::class);
+    $store->pdo();
+    app()->instance(MaintenanceLock::class, new class(mailboxPaths()->lock()) extends MaintenanceLock
+    {
+        public function exclusive(callable $fn, bool $blocking = true): mixed
+        {
+            return null;
+        }
+    });
+
+    $this->delete('/_mailbox/messages/'.$id)->assertStatus(503);
+    $this->post('/_mailbox/clear')->assertStatus(503);
+
+    expect($store->find($id))->not->toBeNull()
+        ->and($store->count())->toBe(1);
 });
 
 it('validates read input and returns json mutation results', function () {

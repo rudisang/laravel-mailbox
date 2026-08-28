@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Mail;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 
@@ -62,4 +63,23 @@ it('clear and prune commands work', function () {
     $this->artisan('mailbox:prune')->assertExitCode(0);
     $this->artisan('mailbox:clear', ['--force' => true])->assertExitCode(0);
     expect(app(MessageStore::class)->count())->toBe(0);
+});
+
+it('clear fails when the maintenance callback does not run', function () {
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject('x')->text('x'));
+    $store = app(MessageStore::class);
+    $store->pdo();
+    app()->instance(MaintenanceLock::class, new class(app(StoragePaths::class)->lock()) extends MaintenanceLock
+    {
+        public function exclusive(callable $fn, bool $blocking = true): mixed
+        {
+            return null;
+        }
+    });
+
+    $command = $this->artisan('mailbox:clear', ['--force' => true]);
+
+    expect(fn () => $command->execute())
+        ->toThrow(RuntimeException::class, 'Mailbox maintenance could not acquire the exclusive lock.');
+    expect($store->count())->toBe(1);
 });

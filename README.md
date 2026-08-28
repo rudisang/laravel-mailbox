@@ -167,7 +167,7 @@ it('captures the final invoice message', function (): void {
 
 The distinction matters for Bcc: `assertBcc` checks the protected original recipient data, while `assertRawHeaderMissing('Bcc')` checks the final raw header block.
 
-`CapturedMessage` also exposes the captured facts through methods: `id`, `seq`, `messageId`, `subject`, `from`, `to`, `cc`, `bcc`, `replyTo`, `envelopeSender`, `envelopeRecipients`, `rawHeaders`, `header`, `headers`, `html`, `text`, `raw`, `parts`, `attachments`, `attachmentContent`, `tags`, `metadata`, `context`, `parseStatus`, `parseError`, `diagnostics`, `links`, and `record`.
+`CapturedMessage` also exposes the captured facts through methods: `id`, `seq`, `messageId`, `subject`, `from`, `to`, `cc`, `bcc`, `replyTo`, `envelopeSender`, `envelopeRecipients`, `rawHeaders`, `header`, `headers`, `html`, `text`, `raw`, `parts`, `attachments`, `attachmentContent`, `tags`, `metadata`, `context`, `parseStatus`, `parseError`, `diagnostics`, and `links`.
 
 ### Namespaces and real queue workers
 
@@ -294,7 +294,7 @@ composer audit
 vendor/bin/pint --test
 vendor/bin/phpstan analyse
 vendor/bin/pest
-vendor/bin/pest --type-coverage --min=95
+composer test:types
 ```
 
 Please report security issues through the private channel in the [security policy](.github/SECURITY.md), not in a public issue.

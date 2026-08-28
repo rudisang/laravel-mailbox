@@ -13,6 +13,8 @@ use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 
 /**
+ * Public Laravel test-case integration for the mailbox testing API.
+ *
  * @phpstan-require-extends TestCase
  */
 // @phpstan-ignore trait.unused (Public consumer trait; usages live in downstream Laravel test cases.)

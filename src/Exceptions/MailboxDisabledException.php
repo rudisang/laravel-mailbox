@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Exceptions;
 
 use Symfony\Component\Mailer\Exception\TransportException;
 
+/** Thrown by the mailbox transport when capture is disabled by the environment guard. */
 final class MailboxDisabledException extends TransportException
 {
     public static function because(string $reason): self

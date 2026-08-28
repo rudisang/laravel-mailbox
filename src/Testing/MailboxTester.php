@@ -11,10 +11,12 @@ use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 
+/** Public query and assertion API created by InteractsWithMailbox. */
 final class MailboxTester
 {
     private const PAGE_SIZE = 200;
 
+    /** @internal The InteractsWithMailbox trait constructs testers for consumers. */
     public function __construct(
         private readonly MessageStore $store,
         private readonly StoragePaths $paths,

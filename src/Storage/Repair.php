@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Storage;
 
 use Rudisang\Mailbox\Support\StoragePaths;
 
+/** @internal */
 final class Repair
 {
     public function __construct(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Http;
 
+/** @internal */
 final class Routing
 {
     public static function basePath(): string

@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Capture;
 
 use Throwable;
 
+/** @internal */
 final class RawHeaderBlock
 {
     /** @return list<array{0: string, 1: string}> */

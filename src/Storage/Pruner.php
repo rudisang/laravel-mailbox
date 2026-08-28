@@ -8,6 +8,7 @@ use DateInterval;
 use DateTimeImmutable;
 use DateTimeZone;
 
+/** @internal */
 final class Pruner
 {
     private readonly MessageStore $store;

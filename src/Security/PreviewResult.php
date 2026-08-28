@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Security;
 
+/** @internal */
 final readonly class PreviewResult
 {
     /**

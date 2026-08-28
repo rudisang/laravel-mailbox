@@ -130,4 +130,4 @@ jobs:
         run: vendor/bin/phpstan analyse
 
       - name: Check type coverage
-        run: vendor/bin/pest --type-coverage --min=95
+        run: composer test:types

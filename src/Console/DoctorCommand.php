@@ -12,6 +12,7 @@ use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Throwable;
 
+/** @internal */
 final class DoctorCommand extends Command
 {
     /** @var string */

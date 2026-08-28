@@ -12,6 +12,7 @@ use Rudisang\Mailbox\Support\StoragePaths;
 use RuntimeException;
 use Throwable;
 
+/** @internal */
 final class MessageStore
 {
     private ?PDO $pdo = null;

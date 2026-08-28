@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Storage;
 
 use RuntimeException;
 
+/** @internal */
 class MaintenanceLock
 {
     public function __construct(private readonly string $path) {}

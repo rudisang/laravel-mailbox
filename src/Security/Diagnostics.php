@@ -7,6 +7,7 @@ namespace Rudisang\Mailbox\Security;
 use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\PartRecord;
 
+/** @internal */
 final class Diagnostics
 {
     /** @var non-empty-string */

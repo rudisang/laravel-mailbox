@@ -34,6 +34,7 @@ use Rudisang\Mailbox\Support\Limits;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Rudisang\Mailbox\Transport\LocalTransportFactory;
 
+/** @internal */
 class MailboxServiceProvider extends ServiceProvider
 {
     /** @var array<int, mixed> */

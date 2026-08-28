@@ -9,6 +9,7 @@ use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Support\StoragePaths;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
+/** @internal */
 final class PartController
 {
     public function __construct(

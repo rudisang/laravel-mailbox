@@ -9,6 +9,7 @@ use Rudisang\Mailbox\Security\HtmlPreviewSanitizer;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Symfony\Component\HttpFoundation\Response;
 
+/** @internal */
 final class PreviewController
 {
     /** @var non-empty-string */

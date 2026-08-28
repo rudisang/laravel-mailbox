@@ -8,6 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Contracts\Foundation\Application;
 use Rudisang\Mailbox\Exceptions\MailboxDisabledException;
 
+/** @internal */
 final class EnvironmentGuard
 {
     public function __construct(private readonly Application $app, private readonly Repository $config) {}

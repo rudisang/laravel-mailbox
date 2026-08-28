@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox;
 
 use Rudisang\Mailbox\Capture\ContextCollector;
 
+/** Public facade for capture context and context redaction rules. */
 final class Mailbox
 {
     /** @param array<string, mixed> $scalars */

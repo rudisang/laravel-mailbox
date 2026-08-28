@@ -6,6 +6,7 @@ namespace Rudisang\Mailbox\Http;
 
 use Illuminate\Http\Request;
 
+/** @internal */
 final readonly class InboxFilters
 {
     public function __construct(

@@ -9,6 +9,7 @@ use Illuminate\Contracts\Foundation\Application;
 use InvalidArgumentException;
 use RuntimeException;
 
+/** @internal */
 final class StoragePaths
 {
     public function __construct(public readonly string $root) {}

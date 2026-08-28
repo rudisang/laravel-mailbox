@@ -22,6 +22,7 @@ use Symfony\Component\Mime\Part\MessagePart;
 use Symfony\Component\Mime\Part\TextPart;
 use Throwable;
 
+/** @internal */
 class StructuredMessageExtractor
 {
     public function __construct(private readonly Limits $limits) {}
@@ -213,7 +214,7 @@ class StructuredMessageExtractor
                 return;
             }
 
-            $blobPath = $partsDir.'/'.$id.'.bin';
+            $blobPath = $partsDir.DIRECTORY_SEPARATOR.$id.'.bin';
             $result = PartWriter::write($part, $blobPath);
             $parts[] = new ExtractedPart(
                 $id,
