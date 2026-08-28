@@ -767,11 +767,17 @@ svg.mb-i-sm {
 
 /* --mb-muted alone dips under 4.5:1 against the selected/current row's
    accent-08 background; --mb-muted-strong keeps the same neutral grey
-   family but with enough weight to hold WCAG AA contrast here. */
+   family but with enough weight to hold WCAG AA contrast here. The plain
+   (non warn/danger) tag in a selected/current row's tag strip — e.g. the
+   attachment-count badge — sits on the same accent-08 tint and dips the
+   same way, so it gets the same treatment; the warn/danger tag variants
+   already clear 4.5:1 on this background and are left untouched. */
 .mb-row.is-selected .mb-row__time,
 .mb-row.is-selected .mb-row__preview,
+.mb-row.is-selected .mb-tag:not(.mb-tag--warn):not(.mb-tag--danger),
 .mb-row[aria-current="true"] .mb-row__time,
-.mb-row[aria-current="true"] .mb-row__preview {
+.mb-row[aria-current="true"] .mb-row__preview,
+.mb-row[aria-current="true"] .mb-tag:not(.mb-tag--warn):not(.mb-tag--danger) {
     color: var(--mb-muted-strong);
 }
 
@@ -1740,7 +1746,12 @@ kbd {
     padding: 0 5px;
     border-radius: var(--mb-r-pill);
     background: var(--mb-accent-08);
-    color: var(--mb-muted);
+    /* --mb-muted dips under 4.5:1 on this pill's accent-08 tint (itself
+       sitting on the segmented control's --mb-surface-2); --mb-muted-strong
+       is the same neutral grey family with enough weight to hold WCAG AA
+       here. The selected-tab and --warn variants below already clear 4.5:1
+       and override this. */
+    color: var(--mb-muted-strong);
     font-size: var(--mb-fs-xs);
     line-height: 16px;
     text-align: center;
