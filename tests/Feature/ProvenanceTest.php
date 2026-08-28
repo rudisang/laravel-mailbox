@@ -6,13 +6,13 @@ use Illuminate\Contracts\Queue\Job;
 use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
+use Rudisang\Mailbox\Capture\ContextCollector;
 use Rudisang\Mailbox\Mailbox;
-use Rudisang\Mailbox\MailboxServiceProvider;
 use Rudisang\Mailbox\Storage\MessageStore;
+use Symfony\Component\Mime\Email;
 use Workbench\App\Mail\WelcomeMail;
 use Workbench\App\Notifications\VerifyAccount;
 use Workbench\App\Providers\WorkbenchServiceProvider;
@@ -85,14 +85,47 @@ it('accepts bounded app context and applies redaction', function () {
     Mailbox::redactContextUsing(null);
 });
 
-it('does not misattribute a mailable when the send is cancelled', function () {
-    Event::listen(MessageSending::class, fn () => false);
-    Mail::to('ada@example.com')->send(new WelcomeMail('Cancelled'));
-    expect(app(MessageStore::class)->count())->toBe(0);
+it('re-bounds context after redaction', function () {
+    $extra = [];
+    foreach (range(1, 70) as $index) {
+        $extra['app.extra.'.$index] = 'value-'.$index;
+    }
+
+    Mailbox::redactContextUsing(fn (array $ctx) => array_merge($ctx, [
+        'app.big' => str_repeat('x', 5000),
+        'app.obj' => new stdClass,
+        str_repeat('k', 100) => 'v',
+    ], $extra));
+
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject('re-bound')->text('x'));
+    $context = app(MessageStore::class)->list()[0]->context;
+
+    expect(strlen($context['app.big']))->toBe(1024)
+        ->and(array_key_exists('app.obj', $context))->toBeFalse()
+        ->and($context[str_repeat('k', 64)])->toBe('v')
+        ->and(count($context))->toBeLessThanOrEqual(64);
+    Mailbox::redactContextUsing(null);
+});
+
+it('does not misattribute a mailable when subject and recipients differ', function () {
+    $stale = (new Email)->subject('stale')->to('x@example.com');
+    app(ContextCollector::class)->rememberSending($stale, ['__laravel_mailable' => 'App\\Mail\\Stale']);
 
     app('events')->forget(MessageSending::class);
-    (new MailboxServiceProvider($this->app))->boot();
-    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject('plain send')->text('x'));
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('y@example.com')->subject('fresh')->text('x'));
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('z@example.com')->subject('later')->text('x'));
+    $list = app(MessageStore::class)->list();
 
-    expect(app(MessageStore::class)->list()[0]->context['mailable'])->toBeNull();
+    expect($list[1]->context['mailable'])->toBeNull()
+        ->and($list[0]->context['mailable'])->toBeNull();
+});
+
+it('attributes a mailable when subject and recipients match', function () {
+    $matching = (new Email)->subject('matching')->to('x@example.com');
+    app(ContextCollector::class)->rememberSending($matching, ['__laravel_mailable' => 'App\\Mail\\Matching']);
+
+    app('events')->forget(MessageSending::class);
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('x@example.com')->subject('matching')->text('x'));
+
+    expect(app(MessageStore::class)->list()[0]->context['mailable'])->toBe('App\\Mail\\Matching');
 });

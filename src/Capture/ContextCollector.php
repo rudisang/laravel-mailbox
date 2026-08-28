@@ -13,7 +13,15 @@ use Symfony\Component\Mime\RawMessage;
 
 final class ContextCollector
 {
-    /** @var array{subject: ?string, to: list<string>, data: array<string, mixed>}|null */
+    /**
+     * @var array{
+     *     subject: ?string,
+     *     to: list<string>,
+     *     mailable: ?string,
+     *     notification: ?string,
+     *     notification_id: ?string
+     * }|null
+     */
     private ?array $sending = null;
 
     /** @var array<string, string|null> */
@@ -43,7 +51,15 @@ final class ContextCollector
         $this->sending = [
             'subject' => $message->getSubject(),
             'to' => AddressNormalizer::emails(array_values($message->getTo())),
-            'data' => $data,
+            'mailable' => is_scalar($data['__laravel_mailable'] ?? null)
+                ? (string) $data['__laravel_mailable']
+                : null,
+            'notification' => is_scalar($data['__laravel_notification'] ?? null)
+                ? (string) $data['__laravel_notification']
+                : null,
+            'notification_id' => is_scalar($data['__laravel_notification_id'] ?? null)
+                ? (string) $data['__laravel_notification_id']
+                : null,
         ];
     }
 
@@ -55,9 +71,10 @@ final class ContextCollector
     public function jobStarted(string $connection, JobContract $job): void
     {
         $payload = $job->payload();
+        $payloadUuid = $payload['uuid'] ?? null;
         $this->job = [
             'job' => $job->resolveName(),
-            'job_id' => $job->uuid() ?? (isset($payload['uuid']) ? (string) $payload['uuid'] : null),
+            'job_id' => $job->uuid() ?? (is_scalar($payloadUuid) ? (string) $payloadUuid : null),
             'queue' => $job->getQueue(),
             'connection' => $connection,
         ];
@@ -120,10 +137,9 @@ final class ContextCollector
         if ($this->sending !== null && $original instanceof Email
             && $this->sending['subject'] === $original->getSubject()
             && $this->sending['to'] === AddressNormalizer::emails(array_values($original->getTo()))) {
-            $data = $this->sending['data'];
-            $context['mailable'] = isset($data['__laravel_mailable']) && is_string($data['__laravel_mailable']) ? $data['__laravel_mailable'] : null;
-            $context['notification'] = isset($data['__laravel_notification']) && is_string($data['__laravel_notification']) ? $data['__laravel_notification'] : null;
-            $context['notification_id'] = isset($data['__laravel_notification_id']) ? (string) $data['__laravel_notification_id'] : null;
+            $context['mailable'] = $this->sending['mailable'];
+            $context['notification'] = $this->sending['notification'];
+            $context['notification_id'] = $this->sending['notification_id'];
         }
 
         $this->sending = null;
