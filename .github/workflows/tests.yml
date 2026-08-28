@@ -1,0 +1,127 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: L12 floor
+            php: '8.2'
+            laravel: '12.*'
+            testbench: '10.*'
+            dependencies: --prefer-lowest
+          - name: L12 latest
+            php: '8.4'
+            laravel: '12.*'
+            testbench: '10.*'
+            dependencies: --prefer-stable
+          - name: L13 floor
+            php: '8.3'
+            laravel: '13.*'
+            testbench: '11.*'
+            dependencies: --prefer-lowest
+          - name: L13 latest
+            php: '8.5'
+            laravel: '13.*'
+            testbench: '11.*'
+            dependencies: --prefer-stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      - name: Install matrix dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+          composer update ${{ matrix.dependencies }} --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: composer test:unit
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:13.*" "orchestra/testbench:11.*" --no-interaction --no-update
+          composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: composer test:unit
+
+  browser:
+    name: Browser
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/Browser/package-lock.json
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Run browser tests
+        run: cd tests/Browser && npm ci && npx playwright install --with-deps chromium webkit && npm test
+
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: xdebug
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Audit dependencies
+        run: composer audit
+
+      - name: Check formatting
+        run: composer lint:check
+
+      - name: Run static analysis
+        run: composer analyse
+
+      - name: Check type coverage
+        run: composer test:types

@@ -17,6 +17,7 @@
     --mb-ink: #0a0a0a;
     --mb-ink-2: #333333;
     --mb-muted: #6b6b6b;
+    --mb-muted-strong: #5c5c5c;
 
     /* lines */
     --mb-hairline: #e6e6e6;
@@ -84,6 +85,7 @@
     --mb-ink: #fafafa;
     --mb-ink-2: #d6d6d6;
     --mb-muted: #9a9a9a;
+    --mb-muted-strong: #b3b3b3;
     --mb-hairline: #262626;
     --mb-hairline-2: #333333;
     --mb-accent: #fafafa;
@@ -115,6 +117,7 @@
         --mb-ink: #fafafa;
         --mb-ink-2: #d6d6d6;
         --mb-muted: #9a9a9a;
+        --mb-muted-strong: #b3b3b3;
         --mb-hairline: #262626;
         --mb-hairline-2: #333333;
         --mb-accent: #fafafa;
@@ -760,6 +763,16 @@ svg.mb-i-sm {
 .mb-row[aria-current="true"] {
     background: var(--mb-accent-08);
     border-left-color: var(--mb-accent);
+}
+
+/* --mb-muted alone dips under 4.5:1 against the selected/current row's
+   accent-08 background; --mb-muted-strong keeps the same neutral grey
+   family but with enough weight to hold WCAG AA contrast here. */
+.mb-row.is-selected .mb-row__time,
+.mb-row.is-selected .mb-row__preview,
+.mb-row[aria-current="true"] .mb-row__time,
+.mb-row[aria-current="true"] .mb-row__preview {
+    color: var(--mb-muted-strong);
 }
 
 .mb-row.is-cursor:not(.is-selected) {

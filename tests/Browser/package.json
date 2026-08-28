@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "^1.55",
+    "@axe-core/playwright": "^4.10"
+  },
+  "scripts": {
+    "test": "playwright test"
+  }
+}
