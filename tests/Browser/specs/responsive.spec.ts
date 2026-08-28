@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { resetAndSeed } from './helpers';
 
 const viewports = [
   { name: 'desktop', width: 1440, height: 900 },
@@ -9,7 +10,7 @@ const viewports = [
 const colorSchemes = ['light', 'dark'] as const;
 
 test('inbox and detail remain responsive in light and dark modes', async ({ page }, testInfo) => {
-  await page.goto('/demo/send-all');
+  await resetAndSeed(page);
   await page.locator('#mailbox-list a[data-message]').first().click();
   await expect(page.locator('#mailbox-detail [data-detail-title]')).toBeVisible();
 

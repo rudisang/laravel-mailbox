@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { resetAndSeed } from './helpers';
 
 const mailboxPrefix = 'http://127.0.0.1:8787/_mailbox/';
 
@@ -13,8 +14,11 @@ const mailboxPrefix = 'http://127.0.0.1:8787/_mailbox/';
 // policy — which is the actual containment guarantee the sandbox is supposed to provide.
 const cspBlockPattern = /csp|blocked_by_client|blocked_by_csp/i;
 
-test('the hostile preview executes nothing and makes no request outside the package', async ({ page, request }) => {
-  await request.get('/demo/send/hostile');
+test('the hostile preview executes nothing and makes no request outside the package', async ({ page }) => {
+  // Reset first: this spec asserts on "the first message in the list" being the hostile
+  // fixture, which only holds if the mailbox is empty before seeding it — the demo seed
+  // routes are additive, and other specs in this suite seed the shared mailbox too.
+  await resetAndSeed(page, '/demo/send/hostile');
 
   const dialogMessages: string[] = [];
   const finishedUrls: string[] = [];
