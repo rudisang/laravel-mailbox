@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Support\ServiceProvider;
 use Rudisang\Mailbox\MailboxServiceProvider;
 use Rudisang\Mailbox\Support\EnvironmentGuard;
 use Rudisang\Mailbox\Support\Limits;
@@ -38,8 +39,19 @@ it('defaults storage to storage/framework/mailbox', function () {
 });
 
 it('publishes the config with the mailbox-config tag', function () {
-    $this->artisan('vendor:publish', ['--tag' => 'mailbox-config'])->assertSuccessful();
+    // Registration is asserted directly against the service provider's
+    // publish groups rather than actually running `vendor:publish`, which
+    // would write into the shared Testbench skeleton
+    // (vendor/orchestra/testbench-core/laravel/config) and can race with
+    // sibling processes booting an app under `--parallel`.
+    $configPath = realpath(__DIR__.'/../../config/mailbox.php');
 
-    expect(config_path('mailbox.php'))->toBeFile();
-    @unlink(config_path('mailbox.php'));
+    $normalize = fn (array $paths): array => collect($paths)
+        ->mapWithKeys(fn ($destination, $source) => [realpath($source) => $destination])
+        ->all();
+
+    expect($normalize(ServiceProvider::pathsToPublish(MailboxServiceProvider::class, 'mailbox-config')))
+        ->toBe([$configPath => config_path('mailbox.php')])
+        ->and($normalize(ServiceProvider::pathsToPublish(MailboxServiceProvider::class, 'mailbox')))
+        ->toBe([$configPath => config_path('mailbox.php')]);
 });
