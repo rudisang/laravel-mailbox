@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Testing;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\Assert;
 use Rudisang\Mailbox\Capture\RawHeaderBlock;
 use Rudisang\Mailbox\Http\MessagePresenter;
@@ -15,6 +16,7 @@ use Rudisang\Mailbox\Storage\MessageRecord;
 use Rudisang\Mailbox\Storage\MessageStore;
 use Rudisang\Mailbox\Storage\PartRecord;
 use Rudisang\Mailbox\Support\StoragePaths;
+use RuntimeException;
 
 final class CapturedMessage
 {
@@ -130,6 +132,58 @@ final class CapturedMessage
         $contents = file_get_contents($this->paths->raw($this->id()));
 
         return $contents === false ? '' : $contents;
+    }
+
+    public function htmlSnapshot(): string
+    {
+        return Snapshots::html($this);
+    }
+
+    public function textSnapshot(): string
+    {
+        return Snapshots::text($this);
+    }
+
+    public function headersSnapshot(): string
+    {
+        return Snapshots::headers($this);
+    }
+
+    public function mimeTreeSnapshot(): string
+    {
+        return Snapshots::mimeTree($this);
+    }
+
+    public function assertMatchesSnapshot(string $expectedHtml): static
+    {
+        Assert::assertSame(
+            $expectedHtml,
+            $this->htmlSnapshot(),
+            'Expected the HTML body to match the field-aware snapshot.',
+        );
+
+        return $this;
+    }
+
+    public function saveEml(string $path): string
+    {
+        return self::write($path, $this->raw());
+    }
+
+    public function saveDiagnostics(string $path, string $format = 'json'): string
+    {
+        $contents = match ($format) {
+            'json' => DiagnosticsWriter::json($this->diagnostics()),
+            'junit' => DiagnosticsWriter::junit($this->diagnostics()),
+            default => throw new InvalidArgumentException(sprintf('Unsupported diagnostics format [%s].', $format)),
+        };
+
+        return self::write($path, $contents);
+    }
+
+    public function saveFixture(string $path): string
+    {
+        return self::write($path, DiagnosticsWriter::json(Snapshots::fixture($this)));
     }
 
     /** @return list<PartRecord> */
@@ -622,5 +676,14 @@ final class CapturedMessage
             $cidMap,
             '/_mailbox-testing/messages/'.$this->id().'/parts',
         );
+    }
+
+    private static function write(string $path, string $contents): string
+    {
+        if (file_put_contents($path, $contents) === false) {
+            throw new RuntimeException(sprintf('Unable to write mailbox artifact [%s].', $path));
+        }
+
+        return $path;
     }
 }
