@@ -83,6 +83,9 @@ class MailboxServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'mailbox');
+
         /** @var MailManager $mailManager */
         $mailManager = $this->app->make('mail.manager');
         $mailManager->extend('local', function (array $config = []) {
