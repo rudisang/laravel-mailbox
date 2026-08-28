@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Rudisang\Mailbox\Capture;
 
+use Throwable;
+
 final class RawHeaderBlock
 {
     /** @return list<array{0: string, 1: string}> */
@@ -20,16 +22,30 @@ final class RawHeaderBlock
         $consumed = 0;
 
         try {
-            while (($line = fgets($handle)) !== false) {
-                $consumed += strlen($line);
+            while (true) {
+                $remaining = $maxBytes - $consumed;
 
-                if ($consumed > $maxBytes) {
-                    $line = substr($line, 0, max(0, strlen($line) - ($consumed - $maxBytes)));
-                    $line = rtrim($line, "\r\n");
-                    self::append($headers, $current, $line);
+                if ($remaining <= 0) {
+                    break;
+                }
+
+                $line = fgets($handle, $remaining + 1);
+
+                if ($line === false) {
+                    break;
+                }
+
+                $length = strlen($line);
+                $consumed += $length;
+                $endsWithNewline = str_ends_with($line, "\n");
+
+                if (! $endsWithNewline && $length === $remaining) {
+                    self::append($headers, $current, rtrim($line, "\r\n"));
 
                     break;
                 }
+
+                $isFinalLine = ! $endsWithNewline && $length < $remaining;
 
                 $line = rtrim($line, "\r\n");
 
@@ -40,6 +56,10 @@ final class RawHeaderBlock
                 if (($line[0] === ' ' || $line[0] === "\t") && $current !== null) {
                     $current[1] .= ' '.trim($line);
 
+                    if ($isFinalLine) {
+                        break;
+                    }
+
                     continue;
                 }
 
@@ -49,10 +69,18 @@ final class RawHeaderBlock
                 if ($colon === false || $colon === 0) {
                     $current = null;
 
+                    if ($isFinalLine) {
+                        break;
+                    }
+
                     continue;
                 }
 
                 $current = [trim(substr($line, 0, $colon)), trim(substr($line, $colon + 1))];
+
+                if ($isFinalLine) {
+                    break;
+                }
             }
 
             self::flush($headers, $current);
@@ -108,9 +136,18 @@ final class RawHeaderBlock
             return $value;
         }
 
-        $decoded = @iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+        try {
+            $decoded = self::decodeMimeHeader($value);
+        } catch (Throwable) {
+            return $value;
+        }
 
         return is_string($decoded) ? $decoded : $value;
+    }
+
+    private static function decodeMimeHeader(string $value): mixed
+    {
+        return mb_decode_mimeheader($value);
     }
 
     /** @param  list<array{0: string, 1: string}>  $headers */

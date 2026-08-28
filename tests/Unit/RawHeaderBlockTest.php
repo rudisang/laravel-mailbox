@@ -37,6 +37,46 @@ it('stops at the byte limit and never reads the body', function () {
     @unlink($path);
 });
 
+it('leaves a literal =? that is not an encoded word intact', function () {
+    $path = rawFile("Subject: Save 50=?% today only\r\n\r\n");
+
+    expect(RawHeaderBlock::read($path, 4096))->toBe([['Subject', 'Save 50=?% today only']]);
+    @unlink($path);
+});
+
+it('decodes mixed encoded words and plain text', function () {
+    $path = rawFile("Subject: =?UTF-8?B?w5xuw69jw7Zkw6k=?= plain =?ISO-8859-1?Q?caf=E9?=\r\n\r\n");
+
+    expect(RawHeaderBlock::read($path, 4096))->toBe([['Subject', 'Ünïcödé plain café']]);
+    @unlink($path);
+});
+
+it('bounds memory on a single unterminated multi-megabyte line', function () {
+    $path = rawFile('X-A: '.str_repeat('a', 8 * 1024 * 1024));
+    gc_collect_cycles();
+    memory_reset_peak_usage();
+    $before = memory_get_peak_usage(true);
+
+    $headers = RawHeaderBlock::read($path, 4096);
+
+    $peakGrowth = memory_get_peak_usage(true) - $before;
+
+    expect($headers)->toHaveCount(1)
+        ->and(strlen($headers[0][1]))->toBeLessThanOrEqual(4096)
+        ->and($peakGrowth)->toBeLessThan(4 * 1024 * 1024);
+    @unlink($path);
+});
+
+it('keeps the final header when the file ends without a blank line', function () {
+    $path = rawFile("From: a@example.com\r\nSubject: final");
+
+    expect(RawHeaderBlock::read($path, 4096))->toBe([
+        ['From', 'a@example.com'],
+        ['Subject', 'final'],
+    ]);
+    @unlink($path);
+});
+
 it('tolerates LF-only line endings and malformed lines', function () {
     $path = rawFile("Subject: ok\nno-colon-line\n: empty name\nX-Z: z\n\nbody");
 
