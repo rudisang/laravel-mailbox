@@ -41,5 +41,7 @@ abstract class TestCase extends Orchestra
         $app['config']->set('app.key', 'base64:'.base64_encode(random_bytes(32)));
         $app['config']->set('mail.default', 'local');
         $app['config']->set('mailbox.storage_path', $this->mailboxStoragePath);
+        $app['config']->set('mailbox.retention.max_messages', 5000);
+        $app['config']->set('mailbox.retention.max_bytes', 1024 * 1024 * 1024);
     }
 }
