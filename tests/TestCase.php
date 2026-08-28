@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Rudisang\Mailbox\Tests;
 
 use Illuminate\Support\Facades\File;
+use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
 use Rudisang\Mailbox\MailboxServiceProvider;
 
 abstract class TestCase extends Orchestra
 {
+    use WithWorkbench;
+
     protected string $mailboxStoragePath;
 
     protected function setUp(): void
