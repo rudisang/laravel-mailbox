@@ -18,7 +18,7 @@ class VerifyAccount extends Notification
             ->subject('Verify your email address')
             ->greeting('Hello!')
             ->line('Please click the button below to verify your email address.')
-            ->action('Verify Email Address', 'https://acme.test/verify/'.sha1('demo').'?expires=1893456000&signature=abc123')
+            ->action('Verify Email Address', 'https://acme.test/verify/'.hash('sha256', 'demo').'?expires=1893456000&signature=abc123')
             ->line('If you did not create an account, no further action is required.');
     }
 }
