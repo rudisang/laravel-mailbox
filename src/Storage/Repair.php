@@ -23,7 +23,7 @@ final class Repair
         $this->store->pdo();
 
         /** @var array{orphan_dirs: list<string>, dangling_rows: list<string>, stale_tmp: list<string>} $result */
-        $result = $this->lock->exclusive(fn (): array => $this->scanUnlocked(), true);
+        $result = $this->lock->shared(fn (): array => $this->scanUnlocked());
 
         return $result;
     }
@@ -115,7 +115,14 @@ final class Repair
 
         return array_values(array_filter(
             $entries,
-            static fn (string $entry): bool => $entry !== '.' && $entry !== '..',
+            static function (string $entry) use ($directory): bool {
+                $path = $directory.DIRECTORY_SEPARATOR.$entry;
+
+                return $entry !== '.'
+                    && $entry !== '..'
+                    && is_dir($path)
+                    && ! is_link($path);
+            },
         ));
     }
 }

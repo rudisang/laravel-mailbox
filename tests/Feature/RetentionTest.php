@@ -77,3 +77,20 @@ it('scans and repairs orphan directories, dangling rows and stale tmp', function
         ->and(is_dir($paths->tmpDir().DIRECTORY_SEPARATOR.'01FRESH000000000000000000A'))->toBeTrue()
         ->and($repair->scan())->toBe(['orphan_dirs' => [], 'dangling_rows' => [], 'stale_tmp' => []]);
 });
+
+it('ignores stray files in the messages and tmp directories', function () {
+    $paths = app(StoragePaths::class);
+    $paths->ensureRoot();
+    $messagesFile = $paths->messagesDir().DIRECTORY_SEPARATOR.'.DS_Store';
+    $tmpFile = $paths->tmpDir().DIRECTORY_SEPARATOR.'notes.txt';
+
+    touch($messagesFile, time() - 3600);
+    touch($tmpFile, time() - 3600);
+
+    $repair = app(Repair::class);
+
+    expect($repair->scan())->toBe(['orphan_dirs' => [], 'dangling_rows' => [], 'stale_tmp' => []])
+        ->and($repair->repair())->toBe(['orphan_dirs' => 0, 'dangling_rows' => 0, 'stale_tmp' => 0])
+        ->and(is_file($messagesFile))->toBeTrue()
+        ->and(is_file($tmpFile))->toBeTrue();
+});
