@@ -42,7 +42,7 @@ test('mailbox workflows are keyboard-complete', async ({ page }) => {
   await expect(selectedTab).not.toHaveAttribute('data-tab', initialTab!);
 
   await page.keyboard.press('?');
-  const help = page.locator('dialog:has([data-dialog-close])');
+  const help = page.locator('#mailbox-shortcuts');
   await expect(help).toHaveAttribute('open', '');
   await page.keyboard.press('Escape');
   await expect(help).not.toHaveAttribute('open', '');

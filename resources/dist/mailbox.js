@@ -13,6 +13,8 @@ const unreadBadge = document.getElementById('mailbox-unread');
 const shell = document.querySelector('[data-pane]');
 const toast = document.querySelector('[data-toast]');
 const helpDialog = document.getElementById('mailbox-shortcuts');
+const notifyDialog = document.getElementById('mailbox-notify');
+const notifyButton = document.querySelector('[data-notify]');
 const searchForm = document.querySelector('form[data-search]');
 const searchInput = document.getElementById('mailbox-search');
 
@@ -36,11 +38,30 @@ let etag = null;
 let pollTimer = 0;
 let searchTimer = 0;
 let toastTimer = 0;
+let copyTimer = 0;
 let lastActivity = Date.now();
+let polling = false;
+let pollAgain = false;
+let announced = seq;
 
 const IDLE_MS = 10 * 60 * 1000;
 const POLL_VISIBLE = 2000;
 const POLL_HIDDEN = 30000;
+const POLL_HIDDEN_NOTIFYING = 5000;
+
+const NOTIFY_KEY = 'mailbox-notify';
+const NOTIFY_LABELS = {
+    on: 'Notifications on. Click to turn off',
+    off: 'Turn on new-mail notifications',
+    blocked: 'Notifications are blocked in this browser. Click for help',
+    insecure: 'Notifications need HTTPS or localhost. Click for help',
+};
+/* 192px monochrome envelope tile (PNG; browsers do not render SVG notification icons reliably). */
+const NOTIFY_ICON =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADABAMAAACg8nE0AAAAMFBMVEUKCgr///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACO3ZjQAAAAEHRSTlP//wAAAAAAAAAAAAAAAAAADwvvhgAAAxNJREFUeNrtXM2a2yAMFNoeeqv8BjTv/0yt38DssRfTw+bPDgYJJLrrosNmkzgaZkZg4eSzu8BL/ILaSCRz+9fWGVoC/f6F/ejb8sO6p/82bd7+Dc2xvNMhg0Z5kllQPf8uD+rn32Z6AlDLD7CmAFZQjPkVYJ01AR7Z0ECgjR5oIdDzgNGGwGPEaETgPmQ0InAfM1oRuA0arQjcRo1mBK7DRjAONFPoKgzaKfQxcLQj8DHyHh6sdtnnPgxmu+xrFwarZfq500y2BZgt068nkAi8MYEzVNGXN3nEiBEjRowY8SnCHb9DkjyLGGASjjQGWdvitKRADX1ylA8AqMJOEgA4vXr5R70pVeUiNoBTnFNfv313mZJe+FnocDajuLCFR2LVQig4EEGBAtUCuHYChSqaBA7XlSk1ClQEcI0ClScaNRIoArhGAuWlghrfx7YaKdcZtpnoGlbT+8pFDIGWGgaxPEq3O1QoUZkC7Y4UAsSSz1OZQN7kkBfJQZlAHiDmi50YBApluuQouELby5oHOZ8ZDpcBMj5zHGbM5EOfWQ4zAA59Jh6B8lp04DPPYdZil/aZ5zALIOkz02Feb5rwmeswDyDhM7EJsLrrF5/ZDnPb973PbIe5ALtTj+MLxN2AhOficRICTICNzyQhwN1CPfkscViwR3v4LBKID3D3WeSwZJcZKkpUBBCzTzX2ySHzTAVgUzWLxU4/Vggku5QQ5ALJAGIFAdnFkCAnIAO4+ryA2eWcKBVIfL0oAIQg+sQ3GUBcAMZX7ucBEF08dTUMJJd/SQbtqPI33f+PybEuV/Jjb8lD/3yvAQifaB5ENYUOJKrSKEgAKhAWWZlGHYE6fJc5YsSIESNGjIDxw+4B0MUEfwYPvG36M0iEtgtRD4m8afYeDND0XNClTL1lcrScC/6W3BtO4j5LBRr2E2jXWuDLX5OGCM26I0w9GHR0aNXg4cGjekuKRj0qvv6jivDIhjZnZ59K601aCczc00Xl7jAI+gibPAjqCNssW2vx0p7/4jO3tgGYfoS24f+Ewt1/QPn2Qn8B62ClYI4jEOwAAAAASUVORK5CYII=';
+
+/* Read after the constants above are initialised (module-level TDZ). */
+let notifyPref = readNotifyPreference();
 
 /* ---------------------------------------------------------- helpers */
 
@@ -97,6 +118,23 @@ function flash(message) {
 
 function rows() {
     return list ? qsa('a[data-message]', list) : [];
+}
+
+function anyDialogOpen() {
+    return Boolean(helpDialog?.open || notifyDialog?.open);
+}
+
+function openDialog(dialog) {
+    if (!dialog) {
+        return;
+    }
+    if (typeof dialog.showModal === 'function') {
+        if (!dialog.open) {
+            dialog.showModal();
+        }
+    } else {
+        dialog.setAttribute('open', '');
+    }
 }
 
 function setPane(name) {
@@ -378,6 +416,9 @@ function initDetail() {
     if (!detail) {
         return;
     }
+    qsa('[data-copy]', detail).forEach((button) => {
+        button.disabled = false;
+    });
     const tabs = tabButtons();
     if (tabs.length > 0) {
         let remembered = null;
@@ -414,18 +455,288 @@ function setViewport(mode) {
     }
 }
 
+/* ---------------------------------------------------------- notifications */
+
+function readNotifyPreference() {
+    try {
+        return localStorage.getItem(NOTIFY_KEY) === '1';
+    } catch (error) {
+        return false;
+    }
+}
+
+function notifyPreferred() {
+    return notifyPref;
+}
+
+function setNotifyPreference(on) {
+    notifyPref = on;
+    try {
+        localStorage.setItem(NOTIFY_KEY, on ? '1' : '0');
+    } catch (error) {
+        /* storage disabled — the choice lasts for this page only */
+    }
+}
+
+function notifyPermission() {
+    try {
+        return 'Notification' in window ? Notification.permission : 'unsupported';
+    } catch (error) {
+        return 'unsupported';
+    }
+}
+
+/**
+ * Secure context comes first on purpose: on plain http browsers still expose
+ * Notification but report "denied" without ever asking, which would read as "blocked".
+ */
+function notifyState() {
+    if (!window.isSecureContext) {
+        return 'insecure';
+    }
+    const permission = notifyPermission();
+    if (permission === 'unsupported') {
+        return 'unsupported';
+    }
+    if (permission === 'denied') {
+        return 'blocked';
+    }
+
+    return permission === 'granted' && notifyPreferred() ? 'on' : 'off';
+}
+
+function renderNotify() {
+    const state = notifyState();
+    if (!notifyButton) {
+        return state;
+    }
+    notifyButton.hidden = state === 'unsupported';
+    notifyButton.dataset.state = state;
+    notifyButton.setAttribute('aria-pressed', state === 'on' ? 'true' : 'false');
+    if (state === 'blocked' || state === 'insecure') {
+        notifyButton.setAttribute('aria-haspopup', 'dialog');
+        notifyButton.setAttribute('aria-controls', 'mailbox-notify');
+    } else {
+        notifyButton.removeAttribute('aria-haspopup');
+        notifyButton.removeAttribute('aria-controls');
+    }
+    const label = NOTIFY_LABELS[state] || NOTIFY_LABELS.off;
+    notifyButton.title = label;
+    const text = qs('[data-notify-label]', notifyButton);
+    if (text) {
+        text.textContent = label;
+    }
+
+    return state;
+}
+
+function openNotifyHelp(panel) {
+    if (!notifyDialog) {
+        return;
+    }
+    qsa('[data-notify-panel]', notifyDialog).forEach((node) => {
+        node.hidden = node.dataset.notifyPanel !== panel;
+    });
+    openDialog(notifyDialog);
+}
+
+function showNotification(title, options = {}, onclick = null) {
+    try {
+        const notification = new Notification(title, { icon: NOTIFY_ICON, tag: 'mailbox-new', renotify: true, ...options });
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+            if (onclick) {
+                onclick();
+            }
+        };
+
+        return notification;
+    } catch (error) {
+        return null;
+    }
+}
+
+function requestNotifyPermission() {
+    return new Promise((resolve) => {
+        try {
+            const result = Notification.requestPermission(resolve);
+            if (result && typeof result.then === 'function') {
+                result.then(resolve, () => resolve('default'));
+            }
+        } catch (error) {
+            resolve('default');
+        }
+    });
+}
+
+/** Runs synchronously up to the permission request, which browsers gate on the click. */
+async function toggleNotify() {
+    const state = renderNotify();
+
+    if (state === 'insecure' || state === 'blocked') {
+        openNotifyHelp(state);
+
+        return;
+    }
+
+    if (state === 'on') {
+        setNotifyPreference(false);
+        renderNotify();
+        flash('Notifications off');
+        pollSchedule();
+
+        return;
+    }
+
+    const permission = notifyPermission() === 'granted' ? 'granted' : await requestNotifyPermission();
+
+    if (permission === 'granted') {
+        setNotifyPreference(true);
+        renderNotify();
+        flash('Notifications on');
+        /* One confirmation banner every time it is switched on, so the user sees it work. */
+        showNotification('Notifications are on', { body: 'New mail captured by Mailbox will show up here.' });
+        pollSchedule();
+    } else if (permission === 'denied') {
+        renderNotify();
+        openNotifyHelp('blocked');
+    } else {
+        renderNotify();
+        flash('Notifications stay off until you allow them');
+    }
+}
+
+function senderLine(from) {
+    if (!from || !from.address) {
+        return 'Unknown sender';
+    }
+
+    return 'From ' + (from.name ? from.name + ' <' + from.address + '>' : from.address);
+}
+
+/** Only messages above the announced high-water mark count, so a late response never repeats one. */
+function announceArrival(recent, arrived) {
+    const fresh = recent.filter((message) => Number(message.seq) > announced);
+    if (fresh.length === 0) {
+        return;
+    }
+    announced = Math.max(announced, ...fresh.map((message) => Number(message.seq)));
+
+    if (notifyState() !== 'on') {
+        return;
+    }
+    if (document.visibilityState === 'visible' && document.hasFocus()) {
+        return; /* the toast and the list already say it */
+    }
+
+    const count = fresh.length < recent.length ? fresh.length : Math.max(arrived, fresh.length);
+
+    if (count === 1) {
+        const [message] = fresh;
+        const href = base + '/messages/' + String(message.id || '');
+        showNotification(message.subject || '(No subject)', { body: senderLine(message.from) }, () => {
+            if (idFrom(href)) {
+                openMessage(href);
+            }
+        });
+
+        return;
+    }
+
+    showNotification(count + ' new messages', {
+        body: fresh
+            .slice(0, 3)
+            .map((message) => message.subject || '(No subject)')
+            .join('\n'),
+    });
+}
+
+function watchNotifyPermission() {
+    try {
+        navigator.permissions
+            ?.query({ name: 'notifications' })
+            .then((status) => {
+                status.onchange = () => renderNotify();
+            })
+            .catch(() => {
+                /* Safari: no Permissions API for notifications; focus/visibility re-checks cover it */
+            });
+    } catch (error) {
+        /* ignore */
+    }
+}
+
+/* ---------------------------------------------------------- copy */
+
+function copyText(value) {
+    try {
+        if (window.isSecureContext && navigator.clipboard?.writeText) {
+            return navigator.clipboard.writeText(value).then(
+                () => true,
+                () => copyLegacy(value),
+            );
+        }
+    } catch (error) {
+        /* fall through to the legacy path */
+    }
+
+    return Promise.resolve(copyLegacy(value));
+}
+
+function copyLegacy(value) {
+    try {
+        const area = document.createElement('textarea');
+        area.value = value;
+        area.setAttribute('readonly', '');
+        area.setAttribute('aria-hidden', 'true');
+        area.className = 'mb-clipboard';
+        body.appendChild(area);
+        area.focus({ preventScroll: true });
+        area.select();
+        area.setSelectionRange(0, value.length);
+        const copied = document.execCommand('copy');
+        area.remove();
+
+        return copied;
+    } catch (error) {
+        return false;
+    }
+}
+
+function copyFrom(button) {
+    const value = button.dataset.copy || '';
+    copyText(value).then((copied) => {
+        button.focus({ preventScroll: true });
+        if (!copied) {
+            flash('Could not copy. The full value is in the tooltip.');
+
+            return;
+        }
+        button.setAttribute('data-copied', '');
+        window.clearTimeout(copyTimer);
+        copyTimer = window.setTimeout(() => button.removeAttribute('data-copied'), 1600);
+        flash('Message-ID copied');
+    });
+}
+
 /* ---------------------------------------------------------- polling */
 
 function pollSchedule() {
     window.clearTimeout(pollTimer);
     pollTimer = 0;
-    if (Date.now() - lastActivity > IDLE_MS) {
+    const notifying = notifyState() === 'on';
+    if (!notifying && Date.now() - lastActivity > IDLE_MS) {
         return;
+    }
+    let delay = POLL_VISIBLE;
+    if (document.visibilityState !== 'visible') {
+        delay = notifying ? POLL_HIDDEN_NOTIFYING : POLL_HIDDEN;
     }
     pollTimer = window.setTimeout(() => {
         pollTimer = 0;
         pollTick();
-    }, document.visibilityState === 'visible' ? POLL_VISIBLE : POLL_HIDDEN);
+    }, delay);
 }
 
 function pollSoon() {
@@ -444,8 +755,14 @@ function wake() {
 }
 
 async function pollTick() {
+    if (polling) {
+        pollAgain = true; /* one request at a time keeps responses in order */
+
+        return;
+    }
+    polling = true;
     try {
-        const response = await request(base + '/api/status', {
+        const response = await request(base + '/api/status?since=' + encodeURIComponent(String(seq)), {
             headers: etag ? { 'If-None-Match': etag } : {},
         });
 
@@ -456,16 +773,27 @@ async function pollTick() {
             setUnread(Number(status.unread) || 0);
 
             if (next !== seq) {
+                const recent = Array.isArray(status.recent) ? status.recent : [];
+                const arrived = Number(status.arrived) || recent.length;
                 seq = next;
                 body.dataset.mailboxSeq = String(seq);
-                const arrived = await refreshList();
-                if (arrived > 0) {
-                    flash(arrived + ' new message' + (arrived === 1 ? '' : 's'));
+                const fresh = await refreshList();
+                const count = Math.max(fresh, arrived); /* the server count includes mail the current filter hides */
+                if (count > 0) {
+                    flash(count + ' new message' + (count === 1 ? '' : 's'));
                 }
+                announceArrival(recent, arrived);
             }
         }
     } catch (error) {
         /* transient failure — retry on the next tick */
+    }
+    polling = false;
+    if (pollAgain) {
+        pollAgain = false;
+        pollSoon();
+
+        return;
     }
     pollSchedule();
 }
@@ -590,9 +918,25 @@ document.addEventListener('click', (event) => {
     }
 
     const closeButton = event.target.closest?.('[data-dialog-close]');
-    if (closeButton && helpDialog) {
+    if (closeButton) {
         event.preventDefault();
-        helpDialog.close();
+        closeButton.closest('dialog')?.close();
+
+        return;
+    }
+
+    const notifyToggle = event.target.closest?.('[data-notify]');
+    if (notifyToggle) {
+        event.preventDefault();
+        toggleNotify();
+
+        return;
+    }
+
+    const copyButton = event.target.closest?.('[data-copy]');
+    if (copyButton) {
+        event.preventDefault();
+        copyFrom(copyButton);
 
         return;
     }
@@ -662,7 +1006,7 @@ document.addEventListener('keydown', (event) => {
     wake();
 
     if (event.key === 'Escape') {
-        if (helpDialog?.open) {
+        if (anyDialogOpen()) {
             return;
         }
         if (window.innerWidth < 960 && shell?.dataset.pane === 'detail') {
@@ -685,7 +1029,7 @@ document.addEventListener('keydown', (event) => {
         }
     }
 
-    if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target) || helpDialog?.open) {
+    if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target) || anyDialogOpen()) {
         return;
     }
 
@@ -749,16 +1093,7 @@ document.addEventListener('keydown', (event) => {
 });
 
 function openHelp() {
-    if (!helpDialog) {
-        return;
-    }
-    if (typeof helpDialog.showModal === 'function') {
-        if (!helpDialog.open) {
-            helpDialog.showModal();
-        }
-    } else {
-        helpDialog.setAttribute('open', '');
-    }
+    openDialog(helpDialog);
 }
 
 window.addEventListener('popstate', () => {
@@ -775,12 +1110,17 @@ window.addEventListener('popstate', () => {
 });
 
 document.addEventListener('visibilitychange', () => {
+    renderNotify();
     if (document.visibilityState === 'visible') {
         wake();
         pollSoon();
     } else {
         pollSchedule();
     }
+});
+
+window.addEventListener('focus', () => {
+    renderNotify();
 });
 
 ['pointerdown', 'wheel', 'focusin'].forEach((name) => {
@@ -794,18 +1134,23 @@ if (searchInput) {
     });
 }
 
-if (helpDialog) {
-    helpDialog.addEventListener('click', (event) => {
-        if (event.target === helpDialog) {
-            helpDialog.close();
+[helpDialog, notifyDialog].forEach((dialog) => {
+    if (!dialog) {
+        return;
+    }
+    dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) {
+            dialog.close();
         }
     });
-}
+});
 
 /* ---------------------------------------------------------- boot */
 
 bootTheme();
 root.dataset.js = '';
+renderNotify();
+watchNotifyPermission();
 initDetail();
 markSelection();
 if (currentId) {

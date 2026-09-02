@@ -133,7 +133,13 @@ The server-rendered inbox has search, unread and attachment filters, read state,
 - Links
 - Diagnostics
 
-HTML previews can be switched between Phone (375 px), Tablet (768 px), and Desktop (100%) widths. The theme cycles through system, light, and dark and is remembered locally. Links and forms remain usable without JavaScript; live updates, fragment navigation, shortcuts, tabs, viewport presets, and theme switching are progressive enhancements.
+HTML previews can be switched between Phone (375 px), Tablet (768 px), and Desktop (100%) widths. The theme cycles through system, light, and dark and is remembered locally. The Message-ID in the message header is shortened to fit and copies its full value when clicked. Links and forms remain usable without JavaScript; live updates, notifications, fragment navigation, shortcuts, tabs, viewport presets, and theme switching are progressive enhancements.
+
+### Notifications
+
+The mailbox can raise a browser notification when new mail is captured, so the tab does not have to stay in front. Notifications are off until you turn them on with the bell in the toolbar. The browser then asks for permission once, and the choice is remembered per browser; the same bell turns them off again. Each notification shows the subject and sender, and clicking it brings the mailbox forward and opens that message. While the mailbox tab is already in front only the in-page toast is shown.
+
+Browsers only allow notifications on secure pages. `localhost` and `127.0.0.1` count as secure, so the Testbench workbench and most local servers work over plain HTTP. A site such as `http://shop.test` does not; open it over HTTPS instead (`herd secure` on Laravel Herd). If notifications were blocked in the browser, or the page is not secure, the bell explains what to change.
 
 ### Keyboard shortcuts
 

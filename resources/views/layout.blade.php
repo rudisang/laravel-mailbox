@@ -46,6 +46,12 @@
             <span class="mb-theme-label" data-theme-label>System</span>
         </button>
 
+        <button type="button" class="mb-btn mb-btn--ghost mb-btn--icon mb-btn--sm mb-jsonly mb-notify" data-notify data-state="off" aria-pressed="false">
+            <svg class="mb-i mb-i-sm" viewBox="0 0 24 24" aria-hidden="true" data-notify-icon="on"><path d="M6 16.6V11a6 6 0 0 1 12 0v5.6l1.6 1.6H4.4L6 16.6Z"/><path d="M10 20.4a2 2 0 0 0 4 0"/></svg>
+            <svg class="mb-i mb-i-sm" viewBox="0 0 24 24" aria-hidden="true" data-notify-icon="off"><path d="M8.4 6.4A6 6 0 0 1 18 11v5.6l1.6 1.6H9.4"/><path d="M6 11v5.6L4.4 18.2h2.2"/><path d="M10 20.4a2 2 0 0 0 4 0"/><path d="m4 4 16 16"/></svg>
+            <span class="mb-visually-hidden" data-notify-label>Turn on new-mail notifications</span>
+        </button>
+
         <button type="button" class="mb-btn mb-btn--ghost mb-btn--icon mb-btn--sm mb-jsonly" data-shortcuts-help aria-haspopup="dialog" aria-controls="mailbox-shortcuts">
             <svg class="mb-i mb-i-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a2.9 2.9 0 1 1 3.9 2.7c-.8.3-1.1 1-1.1 1.8v.4"/><path d="M12 17.4h.01"/><circle cx="12" cy="12" r="9.2"/></svg>
             <span class="mb-visually-hidden">Keyboard shortcuts</span>
@@ -91,6 +97,30 @@
                 <div class="mb-shortcut"><dt>This dialog</dt><dd><kbd>?</kbd></dd></div>
                 <div class="mb-shortcut"><dt>Close / back to list</dt><dd><kbd>Esc</kbd></dd></div>
             </dl>
+        </div>
+    </dialog>
+
+    <dialog id="mailbox-notify" class="mb-dialog" aria-labelledby="mailbox-notify-title">
+        <div class="mb-dialog__head">
+            <h2 id="mailbox-notify-title">Notifications</h2>
+            <button type="button" class="mb-btn mb-btn--ghost mb-btn--icon mb-btn--sm" data-dialog-close>
+                <svg class="mb-i mb-i-sm" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>
+                <span class="mb-visually-hidden">Close</span>
+            </button>
+        </div>
+        <div class="mb-dialog__body mb-notify-help">
+            <div data-notify-panel="blocked" hidden>
+                <p>This browser is blocking notifications for the mailbox. Allow them, then reload the page.</p>
+                <dl class="mb-steps">
+                    <div><dt>Chrome / Edge</dt><dd>Click the site controls icon at the left of the address bar, set Notifications to Allow, then reload.</dd></div>
+                    <div><dt>Firefox</dt><dd>Click the permissions icon at the left of the address bar and remove the blocked Notifications entry, or use Settings, Privacy and Security, Permissions, Notifications.</dd></div>
+                    <div><dt>Safari</dt><dd>Safari menu, Settings, Websites, Notifications, then set this site to Allow.</dd></div>
+                </dl>
+            </div>
+            <div data-notify-panel="insecure" hidden>
+                <p>Browsers only allow notifications on secure pages. Open the mailbox over HTTPS, or through localhost / 127.0.0.1.</p>
+                <p>Using Laravel Herd? Run <code>herd secure</code> in the project folder and reload this page on https.</p>
+            </div>
         </div>
     </dialog>
 

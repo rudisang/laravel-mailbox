@@ -78,7 +78,21 @@
                 <div><dt>Size</dt><dd>{{ $mailboxBytes($record->rawBytes) }}</dd></div>
                 <div><dt>Mailer</dt><dd>{{ $record->mailer ?? 'Unknown' }}</dd></div>
                 <div><dt>Namespace</dt><dd class="mb-mono">{{ $record->namespace ?? 'None' }}</dd></div>
-                <div><dt>Message-ID</dt><dd class="mb-mono">{{ $record->messageId ?? 'None' }}</dd></div>
+                <div>
+                    <dt>Message-ID</dt>
+                    <dd class="mb-mono">
+                        @if ($record->messageId !== null)
+                            <button type="button" class="mb-copy" data-copy="{{ $record->messageId }}" title="{{ $record->messageId }}" disabled>
+                                <span class="mb-copy__value">{{ $record->messageId }}</span>
+                                <svg class="mb-i mb-i-sm mb-copy__icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A1.5 1.5 0 0 1 6.5 5H15"/></svg>
+                                <svg class="mb-i mb-i-sm mb-copy__done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+                                <span class="mb-visually-hidden">Copy Message-ID</span>
+                            </button>
+                        @else
+                            None
+                        @endif
+                    </dd>
+                </div>
             </dl>
         </header>
 

@@ -255,6 +255,23 @@ it('reports status with etag support', function () {
     $this->get('/_mailbox/api/status', ['If-None-Match' => $etag])->assertOk()->assertJson(['seq' => 2]);
 });
 
+it('previews what arrived after the sequence the client already knows', function () {
+    mailboxCapture('First');
+    mailboxCapture('Second');
+
+    $this->get('/_mailbox/api/status?since=1')
+        ->assertOk()
+        ->assertJson(['seq' => 2, 'arrived' => 1])
+        ->assertJsonPath('recent.0.subject', 'Second')
+        ->assertJsonPath('recent.0.from.address', 'a@example.com')
+        ->assertJsonPath('recent.0.seq', 2)
+        ->assertJsonPath('recent.0.id', mailboxStore()->list()[0]->id)
+        ->assertJsonMissingPath('recent.1');
+
+    $this->get('/_mailbox/api/status?since=2')->assertOk()->assertJsonMissingPath('recent');
+    $this->get('/_mailbox/api/status?since=abc')->assertOk()->assertJsonMissingPath('recent');
+});
+
 it('serves immutable assets and refuses anything else', function () {
     $this->get('/_mailbox/assets/mailbox.css')->assertOk()->assertHeader('Cache-Control', 'immutable, max-age=31536000, public');
     $this->get('/_mailbox/assets/mailbox.js')->assertOk()->assertHeader('Content-Type', 'text/javascript; charset=utf-8');

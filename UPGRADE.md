@@ -8,6 +8,10 @@ Published configuration is copied into the host application and is not updated a
 
 The mailbox store contains disposable local-development captures, not application records or a stable external data format. Before an upgrade, export any message that must be retained with the UI or `$message->saveEml()`. If a release notes a storage incompatibility, clear the store with `php artisan mailbox:clear --force` and let the package recreate it.
 
+## v0.2.0
+
+No upgrade steps. The status endpoint gained optional `arrived` and `recent` keys that only appear when the UI passes `since`; existing keys are unchanged. Browser notifications are a per-browser opt-in in the mailbox toolbar and need a secure page (`localhost`, `127.0.0.1`, or HTTPS).
+
 ## v0.1.0
 
 This is the initial release. There are no upgrade steps from an earlier version.

@@ -1782,3 +1782,163 @@ kbd {
 .mb-panel__foot {
     margin-top: var(--mb-3);
 }
+
+/* ============================================================
+   19. Notifications bell, its help dialog, copy chip
+   ============================================================ */
+
+.mb-notify {
+    position: relative;
+}
+
+/* `hidden` must win over the .mb-jsonly display rule (browsers without page notifications). */
+.mb-notify[hidden] {
+    display: none !important;
+}
+
+.mb-notify [data-notify-icon="off"],
+.mb-notify[data-state="blocked"] [data-notify-icon="on"],
+.mb-notify[data-state="insecure"] [data-notify-icon="on"] {
+    display: none;
+}
+
+.mb-notify[data-state="blocked"] [data-notify-icon="off"],
+.mb-notify[data-state="insecure"] [data-notify-icon="off"] {
+    display: block;
+}
+
+.mb-notify[data-state="on"] {
+    color: var(--mb-ink);
+}
+
+/* The "on" dot: a filled accent point, ringed so it reads over the bell stroke. */
+.mb-notify[data-state="on"]::after {
+    content: "";
+    position: absolute;
+    top: 5px;
+    right: 7px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--mb-accent);
+    box-shadow: 0 0 0 2px var(--mb-canvas);
+}
+
+.mb-notify-help p {
+    margin: 0 0 var(--mb-3);
+    color: var(--mb-ink-2);
+    font-size: var(--mb-fs-md);
+    line-height: 1.5;
+}
+
+.mb-notify-help p:last-child {
+    margin-bottom: 0;
+}
+
+.mb-notify-help code {
+    padding: 1px 6px;
+    border: 1px solid var(--mb-hairline-2);
+    border-radius: 6px;
+    background: var(--mb-surface-2);
+    color: var(--mb-ink);
+}
+
+.mb-steps {
+    margin: var(--mb-4) 0 0;
+}
+
+.mb-steps > div {
+    display: grid;
+    grid-template-columns: 104px 1fr;
+    gap: var(--mb-3);
+    padding: 8px 0;
+    border-top: 1px solid var(--mb-hairline);
+    font-size: var(--mb-fs-md);
+    line-height: 1.5;
+}
+
+.mb-steps dt {
+    color: var(--mb-muted);
+}
+
+.mb-steps dd {
+    margin: 0;
+    color: var(--mb-ink-2);
+}
+
+.mb-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 8px 0 10px;
+    border: 1px solid var(--mb-hairline);
+    border-radius: var(--mb-r-pill);
+    background: var(--mb-surface-2);
+    color: var(--mb-ink-2);
+    font: inherit;
+    font-family: var(--mb-mono);
+    font-size: var(--mb-fs-sm);
+    cursor: pointer;
+    transition: border-color var(--mb-dur) var(--mb-ease), color var(--mb-dur) var(--mb-ease);
+}
+
+.mb-copy:hover {
+    border-color: var(--mb-hairline-2);
+    color: var(--mb-ink);
+}
+
+.mb-copy__value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mb-copy .mb-i {
+    color: var(--mb-muted);
+}
+
+.mb-copy:hover .mb-i,
+.mb-copy[data-copied] .mb-i {
+    color: var(--mb-ink);
+}
+
+.mb-copy__done,
+.mb-copy[data-copied] .mb-copy__icon {
+    display: none;
+}
+
+.mb-copy[data-copied] .mb-copy__done {
+    display: block;
+}
+
+/* Without JavaScript the chip is plain text: the whole value shows and wraps. */
+html:not([data-js]) .mb-copy {
+    height: auto;
+    padding: 3px 10px;
+    cursor: default;
+}
+
+html:not([data-js]) .mb-copy__value {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+html:not([data-js]) .mb-copy .mb-i {
+    display: none;
+}
+
+/* Off-screen scratch textarea for the legacy copy path on plain http. */
+.mb-clipboard {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    opacity: 0;
+    pointer-events: none;
+}

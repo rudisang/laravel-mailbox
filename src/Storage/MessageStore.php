@@ -227,6 +227,33 @@ final class MessageStore
         return (int) $statement->fetchColumn();
     }
 
+    /**
+     * Messages captured after $after up to and including $until, newest first. The upper
+     * bound pins the result to a status snapshot so a concurrent capture is never reported twice.
+     *
+     * @return list<MessageRecord>
+     */
+    public function between(int $after, int $until, int $limit = 5): array
+    {
+        $statement = $this->pdo()->prepare('SELECT * FROM messages WHERE seq > :after AND seq <= :until ORDER BY seq DESC LIMIT :limit');
+        $statement->bindValue(':after', max(0, $after), PDO::PARAM_INT);
+        $statement->bindValue(':until', max(0, $until), PDO::PARAM_INT);
+        $statement->bindValue(':limit', max(1, min(20, $limit)), PDO::PARAM_INT);
+        $statement->execute();
+
+        return $this->messageRecords($statement);
+    }
+
+    public function countBetween(int $after, int $until): int
+    {
+        $statement = $this->pdo()->prepare('SELECT COUNT(*) FROM messages WHERE seq > :after AND seq <= :until');
+        $statement->bindValue(':after', max(0, $after), PDO::PARAM_INT);
+        $statement->bindValue(':until', max(0, $until), PDO::PARAM_INT);
+        $statement->execute();
+
+        return (int) $statement->fetchColumn();
+    }
+
     public function markRead(string $id, bool $read): void
     {
         $statement = $this->pdo()->prepare('UPDATE messages SET read_at = :read_at WHERE id = :id');
