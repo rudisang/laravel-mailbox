@@ -38,7 +38,7 @@ Laravel Mailbox requires **PHP 8.2+** and supports **Laravel 12 and 13**. Larave
 
 
 - PHP 8.2 or newer
-- Laravel 12 or 13
+- Laravel 12+
 - The DOM, Fileinfo, Mbstring, PDO, PDO SQLite, and XMLWriter PHP extensions
 
 ## Installation
