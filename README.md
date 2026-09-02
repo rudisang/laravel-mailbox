@@ -55,7 +55,19 @@ Select the package's `local` transport in your application's `.env` file:
 MAIL_MAILER=local
 ```
 
-Package discovery registers the transport and its routes. Send mail normally, then open `/_mailbox` in the same Laravel application.
+Package discovery registers the transport and its routes — there is nothing else to configure. Open the mailbox in your browser at your app's URL plus `/_mailbox`:
+
+```text
+http://your-app.test/_mailbox
+```
+
+Then send yourself a first message straight from Tinker — paste this as-is:
+
+```bash
+php artisan tinker --execute='Mail::raw("It works! Laravel Mailbox captured this message.", fn ($m) => $m->to("dev@example.com")->subject("Hello from Laravel Mailbox"));'
+```
+
+Refresh `/_mailbox` and the message is there — exact raw MIME, headers, sandboxed preview and diagnostics included. Every mail your app sends from now on lands in the same place.
 
 The package adds `mail.mailers.local` only when that mailer name is not already configured. Run `php artisan mailbox:doctor` if the UI is unavailable or messages are not captured.
 
