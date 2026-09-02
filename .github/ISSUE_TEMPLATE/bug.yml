@@ -1,4 +1,4 @@
-name: Bug Report
+name: Bug report
 description: Report something that is not working as expected.
 title: "[Bug]: "
 labels: ["bug"]
@@ -11,16 +11,16 @@ body:
   - type: input
     id: package-version
     attributes:
-      label: Package Version
+      label: Package version
       description: Provide the package version that you are using.
-      placeholder: 1.0.0
+      placeholder: 0.1.0
     validations:
       required: true
 
   - type: input
     id: laravel-version
     attributes:
-      label: Laravel Version
+      label: Laravel version
       description: Provide the Laravel version that you are using.
       placeholder: 13.0.0
     validations:
@@ -29,7 +29,7 @@ body:
   - type: input
     id: php-version
     attributes:
-      label: PHP Version
+      label: PHP version
       description: Provide the PHP version that you are using.
       placeholder: 8.3.0
     validations:
@@ -38,7 +38,7 @@ body:
   - type: input
     id: operating-system
     attributes:
-      label: Operating System
+      label: Operating system
       description: If relevant, provide the operating system and version where this occurs.
       placeholder: macOS 15.0, Ubuntu 24.04, Windows 11
     validations:
@@ -55,7 +55,7 @@ body:
   - type: textarea
     id: steps-to-reproduce
     attributes:
-      label: Steps To Reproduce
+      label: Steps to reproduce
       description: Provide detailed steps to reproduce the issue. A minimal reproduction repository is helpful when possible.
     validations:
       required: true

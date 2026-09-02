@@ -33,7 +33,7 @@ php artisan tinker
 
 Useful checks while you are in there:
 
-- Queued mail: run `php artisan queue:work` from the same app (the worker inherits `MAIL_MAILER=local`; captures from a worker are attributed to the test/process that queued them via the job payload).
+- Queued mail: run `php artisan queue:work` from the same app (the worker inherits `MAIL_MAILER=local`; when `MAILBOX_NAMESPACE` is set, captures from a worker are attributed to the process that queued them via the job payload).
 - Notifications, Markdown mailables, inline images (`$message->embed(...)`) and attachments all render in the HTML tab; the Diagnostics tab shows what the sanitizer removed.
 - Keyboard: `j`/`k` move, `Enter` opens, `/` searches, `[`/`]` switch tabs, `u` toggles unread, `e` deletes, `?` shows help.
 - Dark mode: the theme button cycles System → Light → Dark.
@@ -60,7 +60,7 @@ it('sends the welcome mail', function () {
 ```
 
 Notes:
-- The package refuses to run outside `local`/`testing` (`APP_ENV`), so `mailbox:doctor` will tell you if the app's environment name is different.
+- By default, the package refuses to run outside `local`/`testing` (`APP_ENV`), so `mailbox:doctor` will tell you if the app's environment name is different.
 - If the app caches config (`php artisan config:cache`), re-run it after changing `.env`; run `php artisan optimize:clear` if routes or views look stale.
 - To unlink later: `composer remove rudisang/laravel-mailbox && composer config --unset repositories.mailbox`.
 
@@ -68,7 +68,7 @@ Notes:
 
 ```bash
 cd ~/Herd/laravel-mailbox
-composer test                 # Larastan + Pint + type coverage + Pest (172 tests incl. 8-process concurrency, SIGKILL and queue:work suites)
+composer test                 # Larastan + Pint + type coverage + Pest, including concurrency, SIGKILL and queue:work suites
 composer serve                # builds the Testbench workbench and serves it; open http://127.0.0.1:8000/demo (or the port it prints)
                               #   /demo/send-all seeds welcome, invoice, newsletter, hostile, unicode, plain, notification, queued
 cd tests/Browser && npm install && npx playwright install chromium webkit && npm test   # sandbox, keyboard, responsive, axe — Chromium + WebKit
@@ -86,7 +86,7 @@ composer test
 (cd tests/Browser && npm test)
 ```
 
-Then decide the branch shape. `main` still points at the design commit; `build/v0.1` holds everything (39 commits) and fast-forwards cleanly:
+Then decide the branch shape. `main` still points at the design commit; `build/v0.1` holds the complete implementation and fast-forwards cleanly:
 
 ```bash
 git checkout main
@@ -101,7 +101,7 @@ You are logged in to GitHub CLI as `rudisang`:
 gh repo create rudisang/laravel-mailbox --public --source=. --remote=origin --push
 ```
 
-The first push runs `.github/workflows/tests.yml`: Laravel 12/13 × PHP 8.2–8.5 (lowest + stable), Windows, the Playwright browser job and the quality job (validate, audit, Pint, Larastan, type coverage). Wait for green before tagging.
+The first push runs `.github/workflows/tests.yml`: four Pest combinations (Laravel 12 on PHP 8.3 with lowest dependencies and PHP 8.4 with stable dependencies; Laravel 13 on PHP 8.3 with lowest dependencies and PHP 8.5 with stable dependencies), a PHP 8.2 no-dev install check, Windows, the Playwright browser job, and the quality job (validate, audit, Pint, Larastan, type coverage). Wait for green before tagging.
 
 Repository settings worth doing once: enable Dependabot (config is committed), set `.github/SECURITY.md`'s private vulnerability reporting under *Security → Policy*, and add release-note labels from `.github/release.yml` if you want generated notes.
 
@@ -117,23 +117,23 @@ Composer resolves versions from tags only — `composer.json` deliberately has n
 
 ### 3d. Packagist
 
-1. Go to https://packagist.org/packages/submit (log in with the account that owns `rudisang`), paste `https://github.com/rudisang/laravel-mailbox`, and submit.
-2. Enable auto-updates: on the package page, follow *"Hook not set up"* — the simplest route is authorising the Packagist GitHub App, otherwise add the webhook URL + your Packagist API token under the repository's *Settings → Webhooks*.
+1. Go to https://packagist.org/packages/submit (log in via GitHub), paste `https://github.com/rudisang/laravel-mailbox`, and submit — this first submission is what claims the `rudisang` vendor name, and indexing is near-immediate. The full click-by-click walkthrough lives in docs/PUBLISHING.md.
+2. Enable auto-updates: connect your GitHub account on your Packagist profile (packagist.org/profile/edit → "Connect to GitHub") so Packagist configures the hook itself; the manual fallback is a repo webhook to `https://packagist.org/api/github?username=rudisang` with your Packagist API token as the secret.
 3. Verify from any app: `composer require --dev rudisang/laravel-mailbox` (no path repository needed any more).
 
 ### 3e. After publishing
 
-- Follow SemVer from `v0.1.0`; the public API is exactly: `config/mailbox.php`, the three commands (`mailbox:doctor|clear|prune`), `Rudisang\Mailbox\Events\MessageCaptured`, `Rudisang\Mailbox\Mailbox::context()/redactContextUsing()`, `Rudisang\Mailbox\Testing\{InteractsWithMailbox, MailboxTester, CapturedMessage}` and the global `mailbox()` helper. Everything else is `@internal`.
+- Follow SemVer from `v0.1.0`; the public API is exactly: `config/mailbox.php`, the three commands (`mailbox:doctor|clear|prune`), `Rudisang\Mailbox\Events\MessageCaptured`, `Rudisang\Mailbox\Mailbox::context()/redactContextUsing()`, `Rudisang\Mailbox\Storage\PartRecord`, `Rudisang\Mailbox\Testing\{InteractsWithMailbox, MailboxTester, CapturedMessage}`, `Rudisang\Mailbox\Exceptions\{CaptureFailedException, MailboxDisabledException, MessageTooLargeException}` and the global `mailbox()` helper. Everything else is `@internal`.
 - Keep `symfony/html-sanitizer` at or above the patched floor (`^7.4.13 || ^8.0.13`); `composer audit` runs in CI.
 - Update `CHANGELOG.md` per release; `UPGRADE.md` for breaking changes.
 
 ## 4. Things to know (decisions made on your behalf during the build)
 
-- **No production use, ever:** the transport throws and the routes return 404 outside `local`/`testing` (case-insensitive); `MAILBOX_ENABLED` can only disable, never enable elsewhere.
-- **CSS is contained, not sanitized:** email HTML is sanitized (scripts, forms, iframes, every author URL removed) and rendered in an empty-token `sandbox` iframe with a per-message CSP; CSS survives verbatim so previews look right, and the CSP blocks every `url()`/`@import` fetch. Verified in Chromium and WebKit.
+- **No production use, ever:** by default, the transport throws and the routes return 404 outside `local`/`testing` (case-insensitive); `MAILBOX_ENABLED` can only disable, never enable in production.
+- **CSS is contained, not sanitized:** Author-controlled URL-bearing HTML attributes are removed; URLs inside retained CSS remain present, but CSP blocks remote fetches.
 - **Links are neutralised in the preview** and listed in the *Links* tab, where only `http/https/mailto` links get an *Open* button.
 - **Captures contain secrets** (reset links, tokens). Storage is `storage/framework/mailbox` (0700), pruned after 7 days / 1,000 messages / 250 MiB.
 - **Queued duplicates are kept** (at-least-once delivery is a real fact worth seeing), never de-duplicated by Message-ID.
-- **Bcc** is stored as protected metadata and never appears in the raw `.eml`, exports or search.
+- **Bcc:** For structured `Email` messages, Symfony removes Bcc from the prepared raw stream while Laravel Mailbox preserves it separately. Arbitrary `RawMessage` captures may contain a literal Bcc header; `.eml` export remains byte-for-byte unchanged.
 - **No Gmail/Outlook/Apple Mail emulation** — viewport presets are browser previews, not client renderings.
 - The plans, specs, review ledgers and every ruling are under `docs/superpowers/` and `.superpowers/sdd/` (the latter is git-ignored).

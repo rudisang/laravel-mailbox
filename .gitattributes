@@ -9,6 +9,7 @@
 /phpstan.neon.dist  export-ignore
 /pint.json          export-ignore
 /workbench          export-ignore
+/testbench.yaml     export-ignore
 /.claude            export-ignore
 /.agents            export-ignore
 /.superpowers       export-ignore
@@ -16,3 +17,4 @@
 /AGENTS.md          export-ignore
 /AGENTS_PACKAGE.md  export-ignore
 /docs               export-ignore
+/art                export-ignore

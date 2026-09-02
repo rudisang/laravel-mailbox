@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - name: L12 floor
-            php: '8.2'
+            php: '8.3'
             laravel: '12.*'
             testbench: '10.*'
             stability: prefer-lowest
@@ -42,6 +42,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
+          extensions: xmlwriter
           coverage: none
 
       - name: Install matrix dependencies
@@ -62,6 +63,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: xmlwriter
           coverage: none
 
       - name: Install dependencies
@@ -82,6 +84,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: xmlwriter
           coverage: none
 
       - uses: actions/setup-node@v4
@@ -112,6 +115,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
+          extensions: xmlwriter
           coverage: xdebug
 
       - name: Install dependencies
@@ -131,3 +135,26 @@ jobs:
 
       - name: Check type coverage
         run: composer test:types
+
+  install-floor:
+    runs-on: ubuntu-latest
+    name: Install floor - P8.2 - L12 - no-dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: dom, curl, libxml, mbstring, fileinfo, sqlite, pdo_sqlite, intl, xmlwriter
+          tools: composer:v2
+          coverage: none
+
+      - name: Prove the runtime dependency floor resolves on PHP 8.2
+        run: |
+          composer require "laravel/framework:12.*" --no-interaction --no-update
+          composer update --prefer-lowest --prefer-dist --no-interaction --no-progress --no-dev --no-scripts
+          composer check-platform-reqs --no-dev
+          php -r "require 'vendor/autoload.php'; new Rudisang\\Mailbox\\Support\\StoragePaths(sys_get_temp_dir()); echo 'autoload ok'.PHP_EOL;"

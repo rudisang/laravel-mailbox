@@ -6,7 +6,7 @@ All notable changes to `rudisang/laravel-mailbox` will be documented in this fil
 
 Nothing yet.
 
-## v0.1.0
+## v0.1.0 - 2026-09-02
 
 - Capture kernel: added the fail-closed local transport, crash-safe exact raw MIME capture, envelope and original-recipient preservation, bounded structured extraction, SQLite index, retention, repair, and concurrency support.
 - Mailbox UI: added the responsive accessible inbox, secure sandboxed HTML and text previews, headers/envelope/MIME/raw/attachment/link views, diagnostics, search, filters, themes, viewport presets, and keyboard navigation.
