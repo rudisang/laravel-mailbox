@@ -33,6 +33,7 @@ trait InteractsWithMailbox
 
         $namespace = $config->get('mailbox.namespace');
         $namespace = is_string($namespace) && $namespace !== '' ? $namespace : (string) Str::ulid();
+        $namespace = substr($namespace, 0, 128);
         $config->set('mailbox.namespace', $namespace);
         $config->set('mail.default', 'local');
         $this->app->make('mail.manager')->purge('local');

@@ -40,6 +40,20 @@ it('honours an existing mailbox.namespace config value', function () {
     expect($this->mailbox()->namespace())->toBe('from-env');
 });
 
+it('truncates a configured namespace to the capture limit', function () {
+    $this->tearDownInteractsWithMailbox();
+    $configuredNamespace = str_repeat('long-namespace-', 10);
+    config()->set('mailbox.namespace', $configuredNamespace);
+    $this->setUpInteractsWithMailbox();
+
+    Mail::to('me@example.com')->send(new WelcomeMail('Me'));
+
+    expect($this->mailbox()->namespace())->toBe(substr($configuredNamespace, 0, 128))
+        ->and($this->mailbox()->namespace())->toHaveLength(128)
+        ->and($this->mailbox()->count())->toBe(1)
+        ->and($this->mailbox()->latest()->subject())->toContain('Welcome');
+});
+
 it('returns captures newest first and advances the wait high-water mark', function () {
     Mail::to('first@example.com')->send(new WelcomeMail('First'));
     Mail::to('second@example.com')->send(new WelcomeMail('Second'));
