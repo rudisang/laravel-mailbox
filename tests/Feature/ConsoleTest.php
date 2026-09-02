@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Support\Facades\Mail;
+use Rudisang\Mailbox\Storage\MaintenanceLock;
+use Rudisang\Mailbox\Storage\MessageStore;
+use Rudisang\Mailbox\Support\StoragePaths;
+
+it('doctor reports healthy state and exits 0', function () {
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Schema","detail":"Version 1."')
+        ->assertExitCode(0);
+});
+
+it('doctor reports a mailer collision, failover composition and production as critical', function () {
+    config()->set('mail.mailers.local', ['transport' => 'smtp']);
+    config()->set('mail.mailers.failover', ['transport' => 'failover', 'mailers' => ['smtp', 'local']]);
+
+    $this->artisan('mailbox:doctor')->expectsOutputToContain('mail.mailers.local')->expectsOutputToContain('failover')->assertExitCode(1);
+
+    $this->app['env'] = 'production';
+    $this->artisan('mailbox:doctor', ['--json' => true])->assertExitCode(1);
+});
+
+it('doctor resolves local transports referenced under non-local mailer names', function () {
+    config()->set('mail.mailers.captured', ['transport' => 'local']);
+    config()->set('mail.mailers.roundrobin', ['transport' => 'roundrobin', 'mailers' => ['smtp', 'captured']]);
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Failover","detail":"A local transport appears in mail.mailers.roundrobin.mailers')
+        ->assertExitCode(1);
+});
+
+it('doctor reports missing web middleware as critical', function () {
+    config()->set('mailbox.middleware', []);
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Middleware","detail":"mutations lose CSRF protection')
+        ->assertExitCode(1);
+});
+
+it('doctor reports an unreadable schema version as critical', function () {
+    app(MessageStore::class)->pdo()->exec("UPDATE mailbox_meta SET value = 'invalid' WHERE key = 'schema_version'");
+
+    $this->artisan('mailbox:doctor', ['--json' => true])
+        ->expectsOutputToContain('"label":"Schema","detail":"Unable to read mailbox schema version: Mailbox schema version could not be read."')
+        ->assertExitCode(1);
+});
+
+it('doctor --repair removes orphans', function () {
+    $paths = app(StoragePaths::class);
+    $orphan = $paths->messagesDir().DIRECTORY_SEPARATOR.'01ORPHAN00000000000000000B';
+    mkdir($orphan, 0755, true);
+
+    $this->artisan('mailbox:doctor', ['--repair' => true])->expectsOutputToContain('orphan')->assertExitCode(0);
+    expect(is_dir($orphan))->toBeFalse();
+});
+
+it('clear and prune commands work', function () {
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject('x')->text('x'));
+
+    $this->artisan('mailbox:prune')->assertExitCode(0);
+    $this->artisan('mailbox:clear', ['--force' => true])->assertExitCode(0);
+    expect(app(MessageStore::class)->count())->toBe(0);
+});
+
+it('clear fails when the maintenance callback does not run', function () {
+    Mail::mailer('local')->send([], [], fn ($m) => $m->from('a@example.com')->to('b@example.com')->subject('x')->text('x'));
+    $store = app(MessageStore::class);
+    $store->pdo();
+    app()->instance(MaintenanceLock::class, new class(app(StoragePaths::class)->lock()) extends MaintenanceLock
+    {
+        public function exclusive(callable $fn, bool $blocking = true): mixed
+        {
+            return null;
+        }
+    });
+
+    $command = $this->artisan('mailbox:clear', ['--force' => true]);
+
+    expect(fn () => $command->execute())
+        ->toThrow(RuntimeException::class, 'Mailbox maintenance could not acquire the exclusive lock.');
+    expect($store->count())->toBe(1);
+});

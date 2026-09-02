@@ -1,0 +1,165 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: L12 floor
+            php: '8.3'
+            laravel: '12.*'
+            testbench: '10.*'
+            stability: prefer-lowest
+          - name: L12 latest
+            php: '8.4'
+            laravel: '12.*'
+            testbench: '10.*'
+            stability: prefer-stable
+          - name: L13 floor
+            php: '8.3'
+            laravel: '13.*'
+            testbench: '11.*'
+            stability: prefer-lowest
+          - name: L13 latest
+            php: '8.5'
+            laravel: '13.*'
+            testbench: '11.*'
+            stability: prefer-stable
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, curl, libxml, mbstring, fileinfo, pdo, pdo_sqlite, sqlite3, intl, xmlwriter
+          coverage: none
+
+      - name: Install matrix dependencies
+        run: |
+          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest
+
+  windows:
+    name: Windows
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, fileinfo, pdo, pdo_sqlite, sqlite3, intl, xmlwriter
+          coverage: none
+
+      - name: Install dependencies
+        run: |
+          composer require "laravel/framework:13.*" "orchestra/testbench:11.*" --no-interaction --no-update
+          composer update --prefer-stable --prefer-dist --no-interaction
+
+      - name: Run tests
+        run: vendor/bin/pest --exclude-group concurrency
+
+  browser:
+    name: Browser
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, fileinfo, pdo, pdo_sqlite, sqlite3, intl, xmlwriter
+          coverage: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tests/Browser/package-lock.json
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/Browser/package-lock.json') }}
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Run browser tests
+        run: cd tests/Browser && npm ci && npx playwright install --with-deps chromium webkit && npm test
+
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, fileinfo, pdo, pdo_sqlite, sqlite3, intl, xmlwriter
+          coverage: xdebug
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Audit dependencies
+        run: composer audit
+
+      - name: Check formatting
+        run: vendor/bin/pint --test
+
+      - name: Run static analysis
+        run: vendor/bin/phpstan analyse
+
+      - name: Check type coverage
+        run: composer test:types
+
+  install-floor:
+    runs-on: ubuntu-latest
+    name: Install floor - P8.2 - L12 - no-dev
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: dom, curl, libxml, mbstring, fileinfo, sqlite, pdo_sqlite, intl, xmlwriter
+          tools: composer:v2
+          coverage: none
+
+      - name: Prove the runtime dependency floor resolves on PHP 8.2
+        run: |
+          composer require "laravel/framework:12.*" --no-interaction --no-update
+          # `composer update --no-dev` still RESOLVES require-dev (it only skips
+          # installing it), so the dev tools' PHP 8.3+ floors would block this
+          # PHP 8.2 job. Drop require-dev from the manifest first: this job
+          # proves the runtime "require" story only.
+          composer remove --dev --no-update --no-interaction larastan/larastan laravel/pint orchestra/testbench pestphp/pest pestphp/pest-plugin-laravel pestphp/pest-plugin-type-coverage phpstan/extension-installer
+          composer update --prefer-lowest --prefer-dist --no-interaction --no-progress --no-dev --no-scripts
+          composer check-platform-reqs --no-dev
+          php -r "require 'vendor/autoload.php'; new Rudisang\\Mailbox\\Support\\StoragePaths(sys_get_temp_dir()); echo 'autoload ok'.PHP_EOL;"
