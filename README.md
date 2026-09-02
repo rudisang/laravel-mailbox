@@ -66,22 +66,23 @@ Then send yourself an example message straight from Tinker — paste this as-is 
 ```bash
 php artisan tinker --execute='
 $html = <<<HTML
+<style>html,body{height:100%;margin:0;background:#f4f4f5}</style>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f4f4f5;padding:32px 16px;"><tr><td align="center">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;padding:40px;text-align:left;"><tr><td>
 <p style="margin:0 0 24px;font-size:16px;font-weight:800;letter-spacing:3px;color:#111111;">ACME STORE</p>
 <h1 style="margin:0 0 8px;font-size:24px;color:#111111;">Your order is on its way</h1>
-<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b5563;">Order #1042 shipped today. Laravel Mailbox captured this message locally — nothing was actually sent.</p>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#4b5563;">Order #1042 shipped today. Laravel Mailbox captured this message locally. Nothing was actually sent.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #e5e7eb;">
-<tr><td style="padding:14px 0;font-size:15px;color:#111111;">Desk Lamp</td><td align="right" style="padding:14px 0;font-size:15px;color:#111111;">\$79.00</td></tr>
-<tr><td style="padding:0 0 14px;font-size:15px;color:#111111;border-bottom:1px solid #e5e7eb;">Monitor Stand</td><td align="right" style="padding:0 0 14px;font-size:15px;color:#111111;border-bottom:1px solid #e5e7eb;">\$129.00</td></tr>
-<tr><td style="padding:14px 0 0;font-size:16px;font-weight:700;color:#111111;">Total</td><td align="right" style="padding:14px 0 0;font-size:16px;font-weight:700;color:#111111;">\$208.00</td></tr>
+<tr><td style="padding:14px 0;font-size:15px;color:#111111;">Desk Lamp</td><td align="right" style="padding:14px 0;font-size:15px;color:#111111;">P79.00</td></tr>
+<tr><td style="padding:0 0 14px;font-size:15px;color:#111111;border-bottom:1px solid #e5e7eb;">Monitor Stand</td><td align="right" style="padding:0 0 14px;font-size:15px;color:#111111;border-bottom:1px solid #e5e7eb;">P129.00</td></tr>
+<tr><td style="padding:14px 0 0;font-size:16px;font-weight:700;color:#111111;">Total</td><td align="right" style="padding:14px 0 0;font-size:16px;font-weight:700;color:#111111;">P208.00</td></tr>
 </table>
 <p style="margin:28px 0 0;"><a href="https://example.com/orders/1042" style="display:inline-block;background:#111111;color:#ffffff;padding:13px 30px;border-radius:9999px;font-size:14px;font-weight:600;text-decoration:none;">Track order</a></p>
 </td></tr></table>
 </td></tr></table>
 HTML;
 
-$text = "ACME STORE\n\nYour order is on its way\n\nOrder #1042 shipped today.\n\nDesk Lamp      \$79.00\nMonitor Stand  \$129.00\nTotal          \$208.00\n\nTrack order: https://example.com/orders/1042";
+$text = "ACME STORE\n\nYour order is on its way\n\nOrder #1042 shipped today.\n\nDesk Lamp      P79.00\nMonitor Stand  P129.00\nTotal          P208.00\n\nTrack order: https://example.com/orders/1042";
 
 Mail::send([], [], function ($message) use ($html, $text) {
     $message->to("dev@example.com")->subject("Your order is on its way")->html($html)->text($text);
