@@ -2,12 +2,12 @@
 
 ## Supported versions
 
-Laravel Mailbox is pre-1.0 software. Security fixes are released for the latest `0.1.x` version only.
+Laravel Mailbox is pre-1.0 software. Security fixes are released for the latest `0.x` minor version only, currently `0.2.x`.
 
 | Version | Supported |
 |---|---|
-| `0.1.x` | Yes |
-| `< 0.1` | No |
+| `0.2.x` | Yes |
+| `< 0.2` | No |
 
 ## Reporting a vulnerability
 
