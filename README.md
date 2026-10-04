@@ -34,7 +34,7 @@ The promise is a trustworthy view of the email Laravel actually generated: canon
 
 ## Requirements
 
-Laravel Mailbox requires **PHP 8.2+** and supports **Laravel 12 and 13**. Laravel 12 (PHP 8.2–8.5) now receives security fixes only; Laravel 13 (PHP 8.3–8.5) is the actively maintained release. The package tracks the Symfony `mailer`/`mime`/`html-sanitizer` components each Laravel major ships with (Symfony 7.2 on Laravel 12, 7.4/8.x on Laravel 13), so your installed Symfony version always matches what Laravel itself requires. Development uses Orchestra Testbench 10/11 and Pest 4/5 — running the package's own test suite needs **PHP 8.3+**, even though the package installs and runs on PHP 8.2.
+Laravel Mailbox requires **PHP 8.2+** and supports **Laravel 12 and 13**. Laravel 12 (PHP 8.2–8.5) now receives security fixes only; Laravel 13 (PHP 8.3–8.5) is the actively maintained release. The package uses the Symfony `mailer`/`mime`/`html-sanitizer` components Laravel already ships with, and requires their security-patched releases: `mailer` and `mime` 7.4.12+ or 8.0.12+, `html-sanitizer` 7.4.13+ or 8.0.13+. Both Laravel 12 and 13 accept these versions, so a current `composer update` satisfies them. Development uses Orchestra Testbench 10/11 and Pest 4/5 — running the package's own test suite needs **PHP 8.3+**, even though the package installs and runs on PHP 8.2.
 
 
 - PHP 8.2 or newer

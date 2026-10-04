@@ -124,7 +124,7 @@ Composer resolves versions from tags only — `composer.json` deliberately has n
 ### 3e. After publishing
 
 - Follow SemVer from `v0.1.0`; the public API is exactly: `config/mailbox.php`, the three commands (`mailbox:doctor|clear|prune`), `Rudisang\Mailbox\Events\MessageCaptured`, `Rudisang\Mailbox\Mailbox::context()/redactContextUsing()`, `Rudisang\Mailbox\Storage\PartRecord`, `Rudisang\Mailbox\Testing\{InteractsWithMailbox, MailboxTester, CapturedMessage}`, `Rudisang\Mailbox\Exceptions\{CaptureFailedException, MailboxDisabledException, MessageTooLargeException}` and the global `mailbox()` helper. Everything else is `@internal`.
-- Keep `symfony/html-sanitizer` at or above the patched floor (`^7.4.13 || ^8.0.13`); `composer audit` runs in CI.
+- Keep the direct Symfony dependencies at or above their patched floors: `symfony/html-sanitizer` at `^7.4.13 || ^8.0.13`, `symfony/mailer` and `symfony/mime` at `^7.4.12 || ^8.0.12`. `composer audit` runs in CI, but it only audits the latest resolution. Composer also refuses to install versions with known advisories, so the "floor" CI jobs silently skip a vulnerable floor instead of failing; when an advisory lands on a direct dependency, raise the constraint by hand.
 - Update `CHANGELOG.md` per release; `UPGRADE.md` for breaking changes.
 
 ## 4. Things to know (decisions made on your behalf during the build)
